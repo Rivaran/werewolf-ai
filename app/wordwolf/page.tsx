@@ -130,7 +130,7 @@ export default function WordWolfPage() {
   const voteStartSequenceRef = useRef(0)
   const comebackAudioSequenceRef = useRef(0)
 
-  const [theme, setTheme] = useState<Theme>("mama")
+  const [theme] = useState<Theme>("mama")
   const [playerCount, setPlayerCount] = useState(4)
   const [wolfCount, setWolfCount] = useState(1)
   const [foxEnabled, setFoxEnabled] = useState(true)
@@ -170,16 +170,6 @@ export default function WordWolfPage() {
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
-
-  useEffect(() => {
-    if (phase !== "comebackReview" || !comebackRole) return
-
-    void playAudio(
-      comebackRole === "fox"
-        ? "/audio/[14-K-3]キツネの予想したワードはこちらです.wav"
-        : "/audio/[14-W-3]人狼の予想したワードはこちらです.wav"
-    )
-  }, [phase, comebackRole])
 
   const foxCount = foxEnabled ? 1 : 0
   const selectedParticipant =
@@ -241,6 +231,16 @@ export default function WordWolfPage() {
     })
   }
 
+  useEffect(() => {
+    if (phase !== "comebackReview" || !comebackRole) return
+
+    void playAudio(
+      comebackRole === "fox"
+        ? "/audio/[14-K-3]キツネの予想したワードはこちらです.wav"
+        : "/audio/[14-W-3]人狼の予想したワードはこちらです.wav"
+    )
+  }, [phase, comebackRole])
+
   function formatTime(seconds: number) {
     const minutes = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -261,17 +261,17 @@ export default function WordWolfPage() {
   }
 
   function getRoleImage(role: Role) {
-    return `/image/${theme}/${getRoleLabel(role)}.png`
+    return `/image/${getRoleLabel(role)}.png`
   }
 
   function getResultBackground(targetWinner: Winner) {
     if (targetWinner === "fox") {
-      return `/image/${theme}/bg_win_fox.png`
+      return `/image/bg_win_fox.png`
     }
 
     return targetWinner === "werewolves"
-      ? `/image/${theme}/bg_win_wolf.png`
-      : `/image/${theme}/bg_win_village.png`
+      ? `/image/bg_win_wolf.png`
+      : `/image/bg_win_village.png`
   }
 
   function resetRoundSelections() {
@@ -758,31 +758,10 @@ export default function WordWolfPage() {
           </div>
         </div>
 
-        <div style={{ width: "100%", display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 3 }}>
-          <button
-            onClick={() => {
-              setTheme("mama")
-              setShowTitleImage(true)
-            }}
-            className={`${styles.illustrationButton} ${theme === "mama" ? styles.illustrationButtonActive : ""}`}
-          >
-            イラスト1
-          </button>
-          <button
-            onClick={() => {
-              setTheme("ai")
-              setShowTitleImage(true)
-            }}
-            className={`${styles.illustrationButton} ${theme === "ai" ? styles.illustrationButtonActive : ""}`}
-          >
-            イラスト2
-          </button>
-        </div>
-
         {showTitleImage ? (
           <div className={`${styles.titleImageWrap} ${theme === "mama" ? styles.titleImageWrapMama : ""}`} style={{ marginBottom: 8 }}>
             <img
-              src={`/image/${theme}/title_word.png`}
+              src={`/image/title_word.png`}
               alt="言葉人狼タイトル"
               onError={() => setShowTitleImage(false)}
               className={styles.titleImageElement}
@@ -809,7 +788,7 @@ export default function WordWolfPage() {
               }}
               style={{ padding: "8px 10px", borderRadius: 8, border: "2px solid #888", fontSize: 16, cursor: "pointer" }}
             >
-              {[3, 4, 5, 6, 7, 8].map((count) => (
+              {[3, 4, 5, 6, 7, 8, 9].map((count) => (
                 <option key={count} value={count}>{count}</option>
               ))}
             </select>
@@ -989,10 +968,10 @@ export default function WordWolfPage() {
                 村人は同じお題、人狼は別のお題を持っています。自分のお題を直接言いすぎないように話し合い、怪しい人に投票します。
               </p>
               <p style={{ margin: "0 0 10px" }}>
-                キツネ入りでは、村人とも人狼とも違う第三のお題を持つキツネが登場します。キツネはどちらの陣営にも紛れ込めるように話し、最後まで追放されないことを目指します。
+                キツネ入りでは、村人とも人狼とも違う第三のお題を持つキツネが登場します。会話の中で占い師にお題を言い当てられると「釣られた」状態になり、キツネの負けが確定します。釣られずに生き残ることがキツネの目標です。
               </p>
               <p style={{ margin: 0 }}>
-                人狼を追放できれば村人陣営の勝利、人狼が逃げ切れば人狼陣営の勝利です。キツネが生き残っている場合は、キツネ陣営の勝利になります。
+                勝敗は「キツネ→人狼」の順で判定されます。キツネが釣られず生き残っていればキツネ陣営の勝利。キツネが負けていれば、人狼を追放できれば村人陣営の勝利、人狼が逃げ切れば人狼陣営の勝利です。
               </p>
               <button
                 onClick={() => setShowRuleHelp(false)}
@@ -1042,7 +1021,7 @@ export default function WordWolfPage() {
     if (!participant) return null
 
     return (
-      <div className={styles.screenBase} style={{ backgroundImage: `url(/image/${theme}/bg_night.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", position: "relative" }}>
+      <div className={styles.screenBase} style={{ backgroundImage: `url(/image/bg_night.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", position: "relative" }}>
         <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", textAlign: "center" }}>
           <h1 style={{ fontSize: 34, letterSpacing: 2, textShadow: "0 3px 12px rgba(0,0,0,0.6)" }}>キーワード配布</h1>
         </div>
@@ -1072,7 +1051,7 @@ export default function WordWolfPage() {
 
   if (phase === "discussion") {
     return (
-      <div style={{ backgroundImage: `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.25)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, position: "relative" }}>
+      <div style={{ backgroundImage: `url(/image/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.25)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, position: "relative" }}>
         <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", textAlign: "center" }}>
           <h1 style={{ fontSize: 34, textShadow: "0 3px 12px rgba(0,0,0,0.6)", letterSpacing: 2 }}>{day}日目の昼</h1>
         </div>
@@ -1096,7 +1075,7 @@ export default function WordWolfPage() {
 
   if (phase === "voteStart") {
     return (
-      <div style={{ backgroundImage: theme === "mama" ? `url(/image/${theme}/bg_voteStart.png)` : `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.25)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, position: "relative" }}>
+      <div style={{ backgroundImage: theme === "mama" ? `url(/image/bg_voteStart.png)` : `url(/image/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.25)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, position: "relative" }}>
         <h1 style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", fontSize: 34, textShadow: "0 3px 12px rgba(0,0,0,0.6)", letterSpacing: 2 }}>投票タイム</h1>
         <button onClick={() => setPhase("vote")} style={{ marginTop: 30, padding: "10px 22px", fontSize: 16, color: "white", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 12, backdropFilter: "blur(4px)", cursor: "pointer" }}>
           追放者選択画面へ
@@ -1109,7 +1088,7 @@ export default function WordWolfPage() {
   if (phase === "vote") {
     const aliveParticipants = participants.filter((participant) => participant.alive)
     return (
-      <div style={{ backgroundImage: theme === "mama" ? `url(/image/${theme}/bg_vote.png)` : `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.25)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", paddingTop: 120, paddingBottom: 40, gap: 20, position: "relative" }}>
+      <div style={{ backgroundImage: theme === "mama" ? `url(/image/bg_vote.png)` : `url(/image/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.25)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", paddingTop: 120, paddingBottom: 40, gap: 20, position: "relative" }}>
         <h1 style={{ fontSize: 34, textShadow: "0 3px 12px rgba(0,0,0,0.6)", letterSpacing: 2 }}>追放者決定</h1>
         <p style={{ marginTop: -4, fontSize: 20 }}>{tieMode ? "同数だったプレイヤーを選択（複数選択）" : "追放するプレイヤーを選択"}</p>
 
@@ -1130,9 +1109,46 @@ export default function WordWolfPage() {
                   }
                   setSelectedVoteTarget(participant.id)
                 }}
-                style={{ minWidth: 160, padding: "14px 18px", fontSize: 20, borderRadius: 12, border: active ? "3px solid #ff6b6b" : "1px solid rgba(255,255,255,0.25)", background: active ? "rgba(255,107,107,0.72)" : "rgba(255,255,255,0.6)", color: "#222", fontWeight: "bold", cursor: "pointer" }}
+                style={{
+                  minWidth: 160,
+                  minHeight: 86,
+                  padding: "12px 18px",
+                  fontSize: 20,
+                  borderRadius: 14,
+                  border: active ? "3px solid #2f6b2a" : "1px solid rgba(255,255,255,0.35)",
+                  background: active ? "rgba(215, 239, 197, 0.92)" : "rgba(255,255,255,0.6)",
+                  color: active ? "#1f3f1b" : "#222",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  boxShadow: active ? "0 6px 16px rgba(31,63,27,0.26)" : "none",
+                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                プレイヤー{participant.id}
+                <span>プレイヤー{participant.id}</span>
+                {active && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 10,
+                      width: 22,
+                      height: 22,
+                      borderRadius: 999,
+                      background: "#2f6b2a",
+                      color: "white",
+                      fontSize: 14,
+                      lineHeight: "22px",
+                      textAlign: "center",
+                    }}
+                  >
+                    ✓
+                  </span>
+                )}
               </button>
             )
           })}
@@ -1185,7 +1201,7 @@ export default function WordWolfPage() {
 
   if (phase === "execution") {
     return (
-      <div style={{ backgroundImage: theme === "mama" ? `url(/image/${theme}/bg_vote.png)` : `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, padding: "0 20px", textAlign: "center", position: "relative" }}>
+      <div style={{ backgroundImage: theme === "mama" ? `url(/image/bg_vote.png)` : `url(/image/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, padding: "0 20px", textAlign: "center", position: "relative" }}>
         <h1 style={{ fontSize: 40, letterSpacing: 2, textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>追放しました</h1>
         <p style={{ fontSize: 22, fontWeight: "bold" }}>プレイヤー{executedPlayer}</p>
         <button
@@ -1213,7 +1229,7 @@ export default function WordWolfPage() {
 
   if (phase === "comeback") {
     return (
-      <div style={{ backgroundImage: theme === "mama" ? `url(/image/${theme}/bg_vote.png)` : `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: "40px 20px", textAlign: "center", position: "relative" }}>
+      <div style={{ backgroundImage: theme === "mama" ? `url(/image/bg_vote.png)` : `url(/image/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: "40px 20px", textAlign: "center", position: "relative" }}>
         <h1 style={{ fontSize: 36, letterSpacing: 2, textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>逆転チャンス</h1>
         <p style={{ fontSize: 22, fontWeight: "bold" }}>{comebackRole === "fox" ? "キツネの予想タイム" : "人狼の予想タイム"}</p>
         <div style={{ width: "min(100%, 360px)", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1242,7 +1258,7 @@ export default function WordWolfPage() {
 
   if (phase === "comebackReview") {
     return (
-      <div style={{ backgroundImage: theme === "mama" ? `url(/image/${theme}/bg_vote.png)` : `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: "40px 20px", textAlign: "center", position: "relative" }}>
+      <div style={{ backgroundImage: theme === "mama" ? `url(/image/bg_vote.png)` : `url(/image/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: "40px 20px", textAlign: "center", position: "relative" }}>
         <h1 style={{ fontSize: 36, letterSpacing: 2, textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>予想ワード確認</h1>
         <p style={{ fontSize: 22, fontWeight: "bold" }}>{comebackRole === "fox" ? "キツネの予想" : "人狼の予想"}</p>
         <div style={{ width: "min(100%, 420px)", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1268,7 +1284,7 @@ export default function WordWolfPage() {
   if (phase === "result") {
     return (
       <div style={{ backgroundImage: `url(${getResultBackground(winner)})`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, padding: "0 20px", textAlign: "center", position: "relative" }}>
-        <h1 style={{ fontSize: 40, letterSpacing: 2, textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>
+        <h1 style={{ fontSize: "clamp(30px, 9vw, 40px)", letterSpacing: 1, lineHeight: 1.15, whiteSpace: "nowrap", textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>
           {winner === "villagers" ? "村人陣営の勝利" : winner === "werewolves" ? "人狼陣営の勝利" : "キツネ陣営の勝利"}
         </h1>
         {winner !== "fox" && <p style={{ fontSize: 22, fontWeight: "bold" }}>追放：{executedPlayer}番</p>}
@@ -1290,7 +1306,7 @@ export default function WordWolfPage() {
 
   if (phase === "reveal") {
     return (
-      <div style={{ backgroundImage: theme === "ai" ? `url(${getResultBackground(winner)})` : `url(/image/${theme}/bg_vote.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.45)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 20, padding: "90px 20px 40px", position: "relative" }}>
+      <div style={{ backgroundImage: theme === "ai" ? `url(${getResultBackground(winner)})` : `url(/image/bg_vote.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.45)", color: "white", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 20, padding: "90px 20px 40px", position: "relative" }}>
         <h1 style={{ fontSize: 40, letterSpacing: 2, textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>🔍 ネタバラシ</h1>
         <div style={{ width: "min(100%, 560px)", display: "flex", flexDirection: "column", gap: 14 }}>
           {participants.map((participant) => (
