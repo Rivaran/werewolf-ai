@@ -209,6 +209,7 @@ export function useGameState() {
     })
 
     setPlayers(updatedPlayers)
+    saveGameState(updatedPlayers, day, "morning")
 
     if (guarded) {
       setMorningDeath(null)
@@ -340,14 +341,14 @@ export function useGameState() {
       ...prev,
       [num]: executedRole === "werewolf" ? "black" : "white"
     }))
-    setPlayers(prev =>
-      prev.map(p =>
-        p && p.id === num ? { ...p, alive: false } : p
-      )
+    const afterExecute = players.map(p =>
+      p && p.id === num ? { ...p, alive: false } : p
     )
+    setPlayers(afterExecute)
     setVoteTarget(null)
     setExecutedPlayer(num)
     setPhase("execute")
+    saveGameState(afterExecute, day, "execute")
     playAudio(`/audio/[07-${num}]${num}番のプレイヤーは追放されます。遺言をどうぞ.wav`)
   }
 
@@ -486,6 +487,24 @@ export function useGameState() {
     })
   }
 
+  // ゲーム状態保存関数
+  async function saveGameState(statePlayers: typeof players, stateDay: number, statePhase: string) {
+    if (!aiMode) return
+    await fetch("/api/game", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        players: statePlayers.map(p => p ? {
+          id: p.id,
+          role: { id: p.role.id, name: p.role.name },
+          alive: p.alive,
+        } : null),
+        day: stateDay,
+        phase: statePhase,
+      }),
+    }).catch(() => {})
+  }
+
   // ゲームスタート関数
   function startGame() {
 
@@ -544,6 +563,8 @@ export function useGameState() {
     setPhase("roleCheck")
     setCurrentPlayer(1)
     setShowRole(false)
+
+    saveGameState(shuffledPlayers, 0, "roleCheck")
 
     async function runStartAudio() {
       await playAudio("/audio/[00]これから人狼ゲームを開始します.wav")
@@ -778,6 +799,7 @@ export function useGameState() {
     startTimer,
     handleDragEnd,
     playAudio,
+    saveGameState,
     startGame,
     revealRole,
     getNextAlivePlayer,
