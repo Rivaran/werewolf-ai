@@ -47,6 +47,7 @@ export function useGameState() {
   const [players, setPlayers] = useState<(Player | null)[]>(
     Array.from({ length: 4 }, () => null)
   )
+  const [aiMode, setAiMode] = useState(false)
 
   // =========== REFS ===========
 
@@ -753,6 +754,8 @@ export function useGameState() {
     tieTargets,
     setTieMode,
     setTieTargets,
+    aiMode,
+    setAiMode,
     // computed
     roles,
     sensors,
