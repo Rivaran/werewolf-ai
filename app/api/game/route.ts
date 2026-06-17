@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs"
 import path from "path"
 
-const STATE_FILE = path.join(process.cwd(), "..", "game-state.json")
+const STATE_FILE = path.join(process.cwd(), "game-state.json")
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
