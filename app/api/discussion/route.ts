@@ -1,65 +1,52 @@
 import { NextRequest, NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
-import { DiscussionLog } from "@/types/discussion"
-
-const LOGS_DIR = path.join(process.cwd(), "discussion-logs")
-
-function ensureLogsDir() {
-  if (!fs.existsSync(LOGS_DIR)) {
-    fs.mkdirSync(LOGS_DIR, { recursive: true })
-  }
-}
+import { supabase } from "@/lib/supabase"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const gameId = searchParams.get("gameId")
+  if (!gameId) return NextResponse.json({ error: "gameId is required" }, { status: 400 })
 
-  if (!gameId) {
-    return NextResponse.json({ error: "gameId is required" }, { status: 400 })
-  }
+  const { data, error } = await supabase
+    .from("werewolf_discussion_messages")
+    .select("*")
+    .eq("game_id", gameId)
+    .order("timestamp", { ascending: true })
 
-  ensureLogsDir()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const logFile = path.join(LOGS_DIR, `${gameId}.json`)
-  if (!fs.existsSync(logFile)) {
-    const empty: DiscussionLog = {
-      gameId,
-      startedAt: new Date().toISOString(),
-      messages: [],
-    }
-    return NextResponse.json(empty)
-  }
+  const messages = (data ?? []).map(row => ({
+    id: row.id,
+    playerNumber: row.player_number,
+    characterId: row.character_id,
+    message: row.message,
+    day: row.day,
+    timestamp: row.timestamp,
+  }))
 
-  const log: DiscussionLog = JSON.parse(fs.readFileSync(logFile, "utf-8"))
-  return NextResponse.json(log)
+  return NextResponse.json({
+    gameId,
+    startedAt: data?.[0]?.started_at ?? new Date().toISOString(),
+    messages,
+  })
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const { gameId, playerNumber, characterId, message, day } = body
-
   if (!gameId || !playerNumber || !characterId || !message || day === undefined) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
   }
 
-  ensureLogsDir()
-
-  const logFile = path.join(LOGS_DIR, `${gameId}.json`)
-  const log: DiscussionLog = fs.existsSync(logFile)
-    ? JSON.parse(fs.readFileSync(logFile, "utf-8"))
-    : { gameId, startedAt: new Date().toISOString(), messages: [] }
-
-  log.messages.push({
+  const { error } = await supabase.from("werewolf_discussion_messages").insert({
     id: Date.now().toString(),
-    playerNumber,
-    characterId,
+    game_id: gameId,
+    player_number: playerNumber,
+    character_id: characterId,
     message,
     day,
-    timestamp: new Date().toISOString(),
+    started_at: new Date().toISOString(),
   })
 
-  fs.writeFileSync(logFile, JSON.stringify(log, null, 2), "utf-8")
-
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

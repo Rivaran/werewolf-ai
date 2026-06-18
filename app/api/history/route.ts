@@ -1,33 +1,23 @@
 import { NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
-import { DiscussionLog } from "@/types/discussion"
-
-const LOGS_DIR = path.join(process.cwd(), "discussion-logs")
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
-  if (!fs.existsSync(LOGS_DIR)) {
-    return NextResponse.json([])
+  const { data, error } = await supabase
+    .from("werewolf_discussion_messages")
+    .select("game_id, started_at")
+    .order("started_at", { ascending: false })
+
+  if (error) return NextResponse.json([], { status: 500 })
+
+  const map = new Map<string, { gameId: string; startedAt: string; messageCount: number }>()
+  for (const row of data ?? []) {
+    if (!map.has(row.game_id)) {
+      map.set(row.game_id, { gameId: row.game_id, startedAt: row.started_at, messageCount: 0 })
+    }
+    map.get(row.game_id)!.messageCount++
   }
 
-  const files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith(".json"))
-
-  const entries = files
-    .map(file => {
-      try {
-        const log: DiscussionLog = JSON.parse(
-          fs.readFileSync(path.join(LOGS_DIR, file), "utf-8")
-        )
-        return {
-          gameId: log.gameId,
-          startedAt: log.startedAt,
-          messageCount: log.messages.length,
-        }
-      } catch {
-        return null
-      }
-    })
-    .filter((e): e is { gameId: string; startedAt: string; messageCount: number } => e !== null)
+  const entries = Array.from(map.values())
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
 
   return NextResponse.json(entries)

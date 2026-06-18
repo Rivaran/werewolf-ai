@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
-
-const STATE_FILE = path.join(process.cwd(), "game-state.json")
+import { supabase } from "@/lib/supabase"
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  fs.writeFileSync(STATE_FILE, JSON.stringify(body, null, 2), "utf-8")
+  const { error } = await supabase
+    .from("werewolf_game_state")
+    .upsert({ id: "current", data: body, updated_at: new Date().toISOString() })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
 
 export async function GET() {
-  if (!fs.existsSync(STATE_FILE)) {
-    return NextResponse.json({ error: "No game state" }, { status: 404 })
-  }
-  const data = fs.readFileSync(STATE_FILE, "utf-8")
-  return NextResponse.json(JSON.parse(data))
+  const { data, error } = await supabase
+    .from("werewolf_game_state")
+    .select("data")
+    .eq("id", "current")
+    .single()
+  if (error || !data) return NextResponse.json({ error: "No game state" }, { status: 404 })
+  return NextResponse.json(data.data)
 }
