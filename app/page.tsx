@@ -9,9 +9,11 @@ import RoleDisplay from "@/components/RoleDisplay"
 import AliveCounter from "@/components/AliveCounter"
 import RoleCard from "@/components/RoleCard"
 import PlayerSlot from "@/components/PlayerSlot"
+import DiscussionChat from "@/components/DiscussionChat"
 import styles from "./page.module.css"
 import { useGameState } from "@/hooks/useGameState"
 import { useWakeLock } from "@/hooks/useWakeLock"
+import { CHARACTERS } from "@/types/discussion"
 
 const ROLE_SUMMARY_ORDER = [
   { id: "werewolf", label: "人狼" },
@@ -101,6 +103,9 @@ export default function Page() {
     setTieTargets,
     aiMode,
     setAiMode,
+    gameId,
+    playerAssignments,
+    setPlayerAssignments,
     setTimeLeft,
     setTimerRunning,
     setExecutedPlayer,
@@ -1549,84 +1554,13 @@ export default function Page() {
 
   if (phase === "morning" && aiMode) {
     return (
-      <div
-        style={{
-          backgroundImage: `url(/image/${theme}/bg_morning.png)`,
-          backgroundSize: theme === "mama" ? "contain" : "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          color: "white",
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 24,
-          position: "relative",
-        }}
-      >
-        <AliveCounter players={players} theme={theme} currentPlayer={currentPlayer} phase={phase} />
-        <h1
-          style={{
-            position: "absolute",
-            top: 60,
-            left: "50%",
-            transform: "translateX(-50%)",
-            fontSize: 34,
-            textShadow: "0 3px 12px rgba(0,0,0,0.6)",
-            letterSpacing: 2,
-          }}
-        >
-          {day + 1}日目の朝
-        </h1>
-
-        {day !== 0 && (
-          <div
-            style={{
-              padding: "16px 28px",
-              borderRadius: 16,
-              background: "rgba(0,0,0,0.45)",
-              backdropFilter: "blur(6px)",
-              textAlign: "center",
-            }}
-          >
-            {morningDeath === null
-              ? <p>昨晩の犠牲者はいませんでした</p>
-              : <p>昨晩の犠牲者：プレイヤー {morningDeath}</p>}
-          </div>
-        )}
-
-        <div
-          style={{
-            padding: "20px 32px",
-            borderRadius: 16,
-            background: "rgba(0,0,0,0.45)",
-            backdropFilter: "blur(6px)",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ fontSize: 18, marginBottom: 8 }}>🗣 ThreadLogicsで議論してください</p>
-          <p style={{ fontSize: 14, opacity: 0.7 }}>議論・投票が終わったら下のボタンを押してください</p>
-        </div>
-
-        <button
-          onClick={endDiscussion}
-          style={{
-            padding: "14px 36px",
-            fontSize: 20,
-            borderRadius: 14,
-            border: "none",
-            background: "linear-gradient(135deg,#6bd4ff,#2b8cff)",
-            color: "white",
-            fontWeight: "bold",
-            boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
-            cursor: "pointer",
-          }}
-        >
-          議論終了 → 投票へ
-        </button>
-        {renderRoleSummaryButton()}
-      </div>
+      <DiscussionChat
+        gameId={gameId}
+        day={day}
+        morningDeath={morningDeath}
+        playerAssignments={playerAssignments}
+        onEndDiscussion={endDiscussion}
+      />
     )
   }
 
@@ -2102,6 +2036,13 @@ export default function Page() {
           >
             🗣 言葉人狼
           </button>
+
+          <button
+            onClick={() => router.push("/history")}
+            style={{ padding: "12px 0", fontSize: 16, fontWeight: "bold", borderRadius: 14, border: "1px solid rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.8)", cursor: "pointer", width: 240 }}
+          >
+            📜 対戦履歴
+          </button>
         </div>
 
       </div>
@@ -2258,6 +2199,49 @@ export default function Page() {
           🤖 AIと遊ぶ: {aiMode ? "ON" : "OFF"}
         </button>
       </div>
+
+      {aiMode && (
+        <div style={{ width: "100%", marginTop: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: "bold", color: "#555", marginBottom: 8, textAlign: "center" }}>
+            キャラクター割り当て
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from({ length: playerCount }, (_, i) => i + 1).map(num => (
+              <div key={num} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ minWidth: 32, fontSize: 13, color: "#888", fontWeight: "bold" }}>P{num}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {(Object.entries(CHARACTERS) as [string, typeof CHARACTERS[keyof typeof CHARACTERS]][]).map(([cid, char]) => {
+                    const selected = playerAssignments[num] === cid
+                    const usedByOther = Object.entries(playerAssignments).some(([k, v]) => v === cid && Number(k) !== num)
+                    return (
+                      <button
+                        key={cid}
+                        disabled={usedByOther}
+                        onClick={() => setPlayerAssignments(prev => ({ ...prev, [num]: cid }))}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 3,
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          border: selected ? `2px solid ${char.color}` : "1px solid #ddd",
+                          background: selected ? `${char.color}20` : usedByOther ? "#f5f5f5" : "white",
+                          cursor: usedByOther ? "not-allowed" : "pointer",
+                          opacity: usedByOther ? 0.4 : 1,
+                          fontSize: 12,
+                          color: selected ? char.color : "#555",
+                          fontWeight: selected ? "bold" : "normal",
+                        }}
+                      >
+                        <img src={char.img} style={{ width: 20, height: 20, borderRadius: "50%" }} alt="" />
+                        {char.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button
         onClick={startGame}

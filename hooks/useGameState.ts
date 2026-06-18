@@ -48,10 +48,14 @@ export function useGameState() {
     Array.from({ length: 4 }, () => null)
   )
   const [aiMode, setAiMode] = useState(false)
+  const [gameId, setGameId] = useState("")
+  const [playerAssignments, setPlayerAssignments] = useState<Record<number, string>>({})
 
   // =========== REFS ===========
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const gameIdRef = useRef("")
+  const playerAssignmentsRef = useRef<Record<number, string>>({})
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioResolveRef = useRef<(() => void) | null>(null)
   const discussionEndedRef = useRef(false) // stale closure 対策：refは常に最新値を返すのでguardに使う
@@ -488,8 +492,16 @@ export function useGameState() {
   }
 
   // ゲーム状態保存関数
-  async function saveGameState(statePlayers: typeof players, stateDay: number, statePhase: string) {
+  async function saveGameState(
+    statePlayers: typeof players,
+    stateDay: number,
+    statePhase: string,
+    stateGameId?: string,
+    statePlayerAssignments?: Record<number, string>,
+  ) {
     if (!aiMode) return
+    const gid = stateGameId ?? gameIdRef.current
+    const pa = statePlayerAssignments ?? playerAssignmentsRef.current
     await fetch("/api/game", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -501,6 +513,8 @@ export function useGameState() {
         } : null),
         day: stateDay,
         phase: statePhase,
+        gameId: gid,
+        playerAssignments: pa,
       }),
     }).catch(() => {})
   }
@@ -533,6 +547,12 @@ export function useGameState() {
     setTimerRunning(false)
     setPlayers(shuffledPlayers)
 
+    const newGameId = Date.now().toString()
+    gameIdRef.current = newGameId
+    setGameId(newGameId)
+    playerAssignmentsRef.current = playerAssignments
+    setPlayerAssignments(playerAssignments)
+
     const seerIndexes = shuffled
       .map((r, i) => ({ role: r, index: i }))
       .filter(x => x.role.id === "seer")
@@ -564,7 +584,7 @@ export function useGameState() {
     setCurrentPlayer(1)
     setShowRole(false)
 
-    saveGameState(shuffledPlayers, 0, "roleCheck")
+    saveGameState(shuffledPlayers, 0, "roleCheck", newGameId, playerAssignments)
 
     async function runStartAudio() {
       await playAudio("/audio/[00]これから人狼ゲームを開始します.wav")
@@ -666,6 +686,11 @@ export function useGameState() {
     if (morningHandledRef.current) return
 
     morningHandledRef.current = true
+
+    if (aiMode) {
+      setDiscussionReady(true)
+      return
+    }
 
     async function runMorning() {
 
@@ -777,6 +802,10 @@ export function useGameState() {
     setTieTargets,
     aiMode,
     setAiMode,
+    gameId,
+    setGameId,
+    playerAssignments,
+    setPlayerAssignments,
     // computed
     roles,
     sensors,

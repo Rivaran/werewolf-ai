@@ -16,6 +16,8 @@ type Player = {
 } | null
 
 type GameState = {
+  gameId?: string
+  playerAssignments?: Record<number, string>
   players: Player[]
   day: number
   phase: string
@@ -88,6 +90,50 @@ server.tool(
       .filter((p): p is NonNullable<Player> => p !== null && p.alive)
       .map(p => `プレイヤー${p.id}`)
     return { content: [{ type: "text", text: `生存中: ${alive.join("、")}（${alive.length}人）` }] }
+  }
+)
+
+server.tool(
+  "post_discussion_message",
+  "議論フェーズに発言を投稿する。自分のプレイヤー番号と発言内容を指定する。",
+  {
+    player_number: z.number().describe("自分のプレイヤー番号"),
+    message: z.string().describe("発言内容"),
+  },
+  async ({ player_number, message }) => {
+    const state = loadState()
+    if (!state) {
+      return { content: [{ type: "text", text: "ゲームが開始されていません。" }] }
+    }
+    if (!state.gameId) {
+      return { content: [{ type: "text", text: "ゲームIDが見つかりません。AIモードでゲームを開始してください。" }] }
+    }
+
+    const characterId = state.playerAssignments?.[player_number]
+    if (!characterId) {
+      return { content: [{ type: "text", text: `プレイヤー${player_number}のキャラクター割り当てがありません。` }] }
+    }
+
+    const logsDir = path.join(__dirname, "..", "..", "discussion-logs")
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true })
+
+    const logFile = path.join(logsDir, `${state.gameId}.json`)
+    const log = fs.existsSync(logFile)
+      ? JSON.parse(fs.readFileSync(logFile, "utf-8"))
+      : { gameId: state.gameId, startedAt: new Date().toISOString(), messages: [] }
+
+    log.messages.push({
+      id: Date.now().toString(),
+      playerNumber: player_number,
+      characterId,
+      message,
+      day: state.day,
+      timestamp: new Date().toISOString(),
+    })
+
+    fs.writeFileSync(logFile, JSON.stringify(log, null, 2), "utf-8")
+
+    return { content: [{ type: "text", text: `投稿しました: 「${message}」` }] }
   }
 )
 
