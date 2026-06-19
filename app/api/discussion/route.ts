@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 
 export async function GET(request: NextRequest) {
+  const supabase = getSupabase()
   const { searchParams } = new URL(request.url)
   const gameId = searchParams.get("gameId")
   if (!gameId) return NextResponse.json({ error: "gameId is required" }, { status: 400 })
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()
   const body = await request.json()
   const { gameId, playerNumber, characterId, message, day } = body
   if (!gameId || !playerNumber || !characterId || !message || day === undefined) {

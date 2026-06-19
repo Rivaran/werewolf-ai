@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 
 export async function POST(req: NextRequest) {
+  const supabase = getSupabase()
   const body = await req.json()
   const { error } = await supabase
     .from("werewolf_game_state")
@@ -11,6 +12,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("werewolf_game_state")
     .select("data")

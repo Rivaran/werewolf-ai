@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 
 export async function GET() {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("werewolf_discussion_messages")
     .select("game_id, started_at")
