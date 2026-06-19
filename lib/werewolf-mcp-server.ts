@@ -16,6 +16,8 @@ type GameState = {
   originalPlayers?: Player[]
   centerCards?: Array<{ id: string; name: string }>
   privateInfo?: Record<number, string>
+  currentPlayer?: number
+  aiActions?: Record<string, AiNightAction>
   participants?: Array<{
     id: number
     role: "villager" | "werewolf" | "fox"
@@ -26,6 +28,13 @@ type GameState = {
   phase: string
 }
 
+type AiNightAction = {
+  playerNumber: number
+  action: "attack" | "guard" | "inspect" | "inspect_center" | "swap" | "pass"
+  targetPlayer?: number
+  submittedAt: string
+}
+
 function getMode(state: GameState) {
   return state.mode ?? "werewolf"
 }
@@ -34,6 +43,19 @@ function modeLabel(mode: ReturnType<typeof getMode>) {
   if (mode === "onenight") return "一夜人狼"
   if (mode === "wordwolf") return "言葉人狼"
   return "人狼ゲーム"
+}
+
+function actionKey(state: GameState, playerNumber: number) {
+  return `${getMode(state)}:${state.gameId}:${state.day}:${playerNumber}`
+}
+
+async function saveState(state: GameState) {
+  const { error } = await getSupabase().from("werewolf_game_state").upsert({
+    id: "current",
+    data: state,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) throw new Error(error.message)
 }
 
 async function loadState(): Promise<GameState | null> {
@@ -94,6 +116,13 @@ export function createWerewolfMcpServer() {
             ? (allies.length > 0 ? `人狼の仲間: ${allies.join("、")}` : "あなたは一匹狼です。")
             : null,
           state.privateInfo?.[player_number] ?? null,
+          state.phase === "night" && state.currentPlayer === player_number
+            ? original.role.id === "seer"
+              ? "あなたの手番です。submit_night_actionでinspectまたはinspect_centerを選んでください。"
+              : original.role.id === "robber"
+                ? "あなたの手番です。submit_night_actionでswapと交換相手を指定してください。"
+                : "あなたの手番です。submit_night_actionでpassを選んでください。"
+            : null,
         ].filter((line): line is string => Boolean(line))
         return textResult(details.join("\n"))
       }
@@ -109,6 +138,16 @@ export function createWerewolfMcpServer() {
       return textResult(
         `あなた（プレイヤー${player_number}）の役職は「${player.role.name}」です。\n` +
           `現在の生存プレイヤー: ${alive}\n` +
+          (state.privateInfo?.[player_number] ? `${state.privateInfo[player_number]}\n` : "") +
+          (state.phase === "night" && state.currentPlayer === player_number
+            ? player.role.id === "werewolf"
+              ? "あなたの手番です。submit_night_actionでattackと襲撃先を指定してください。\n"
+              : player.role.id === "knight"
+                ? "あなたの手番です。submit_night_actionでguardと護衛先を指定してください。\n"
+                : player.role.id === "seer"
+                  ? "あなたの手番です。submit_night_actionでinspectと占い先を指定してください。\n"
+                  : "あなたの手番です。submit_night_actionでpassを選んでください。\n"
+            : "") +
           (player.alive ? "あなたは生存中です。" : "あなたは死亡しています。")
       )
     }
@@ -155,6 +194,91 @@ export function createWerewolfMcpServer() {
         .filter((item): item is NonNullable<typeof item> => item !== null && item.alive)
         .map((item) => `プレイヤー${item.id}`)
       return textResult(`生存中: ${alive.join("、")}（${alive.length}人）`)
+    }
+  )
+
+  server.registerTool(
+    "submit_night_action",
+    {
+      description: "夜フェーズの行動を決定する。通常人狼の襲撃・護衛・占い、一夜人狼の占い・怪盗交換・行動なしに対応する。",
+      inputSchema: {
+        player_number: z.number().int().positive().describe("自分のプレイヤー番号"),
+        action: z.enum(["attack", "guard", "inspect", "inspect_center", "swap", "pass"]).describe(
+          "attack=襲撃、guard=護衛、inspect=占い、inspect_center=中央2枚の確認、swap=怪盗交換、pass=行動なし"
+        ),
+        target_player: z.number().int().positive().optional().describe("対象プレイヤー番号。passとinspect_centerでは不要"),
+      },
+    },
+    async ({ player_number, action, target_player }) => {
+      const state = await loadState()
+      if (!state) return textResult("ゲームが開始されていません。")
+      if (state.phase !== "night") return textResult("現在は夜フェーズではありません。")
+      if (state.currentPlayer !== player_number) {
+        return textResult(`現在行動するのはプレイヤー${state.currentPlayer ?? "不明"}です。`)
+      }
+
+      const mode = getMode(state)
+      if (mode === "wordwolf") return textResult("言葉人狼には夜行動がありません。")
+      const originalPlayer = mode === "onenight"
+        ? state.originalPlayers?.[player_number - 1]
+        : state.players?.[player_number - 1]
+      if (!originalPlayer) return textResult(`プレイヤー${player_number}は存在しません。`)
+
+      const role = originalPlayer.role.id
+      const expectedActions: Record<string, AiNightAction["action"][]> = mode === "onenight"
+        ? {
+            werewolf: ["pass"],
+            villager: ["pass"],
+            seer: ["inspect", "inspect_center"],
+            robber: ["swap"],
+          }
+        : {
+            werewolf: ["attack"],
+            knight: ["guard"],
+            seer: ["inspect"],
+            villager: ["pass"],
+            madman: ["pass"],
+            medium: ["pass"],
+          }
+      if (!expectedActions[role]?.includes(action)) {
+        return textResult(`役職「${originalPlayer.role.name}」では行動「${action}」を選べません。`)
+      }
+
+      const needsTarget = ["attack", "guard", "inspect", "swap"].includes(action)
+      if (needsTarget && !target_player) return textResult("対象プレイヤー番号を指定してください。")
+      if (target_player === player_number) return textResult("自分自身は対象にできません。")
+      const target = target_player ? state.players?.[target_player - 1] : null
+      if (needsTarget && (!target || !target.alive)) return textResult("そのプレイヤーは対象にできません。")
+      if (mode === "werewolf" && action === "attack" && target?.role.id === "werewolf") {
+        return textResult("人狼の仲間は襲撃できません。")
+      }
+
+      let privateResult = "夜行動を受け付けました。"
+      if (action === "inspect" && target) {
+        privateResult = mode === "werewolf"
+          ? `占い結果: プレイヤー${target_player}は${target.role.id === "werewolf" ? "人狼です" : "人狼ではありません"}。`
+          : `占い結果: プレイヤー${target_player}の役職は「${state.originalPlayers?.[target_player! - 1]?.role.name}」です。`
+      } else if (action === "inspect_center") {
+        privateResult = `中央の2枚は「${state.centerCards?.map(card => card.name).join("」「")}」です。`
+      } else if (action === "swap" && target) {
+        privateResult = `プレイヤー${target_player}と交換し、現在の役職は「${target.role.name}」です。`
+      }
+
+      const nextState: GameState = {
+        ...state,
+        privateInfo: { ...state.privateInfo, [player_number]: privateResult },
+        aiActions: {
+          ...state.aiActions,
+          [actionKey(state, player_number)]: {
+            playerNumber: player_number,
+            action,
+            targetPlayer: target_player,
+            submittedAt: new Date().toISOString(),
+          },
+        },
+      }
+      await saveState(nextState)
+      return textResult(privateResult)
     }
   )
 

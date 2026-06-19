@@ -59,6 +59,7 @@ export function useGameState() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioResolveRef = useRef<(() => void) | null>(null)
   const discussionEndedRef = useRef(false) // stale closure 対策：refは常に最新値を返すのでguardに使う
+  const processedAiActionRef = useRef("")
 
   // =========== COMPUTED ===========
 
@@ -514,11 +515,84 @@ export function useGameState() {
         } : null),
         day: stateDay,
         phase: statePhase,
+        currentPlayer,
         gameId: gid,
         playerAssignments: pa,
+        lastGuardTargets: lastGuardTarget,
       }),
     }).catch(() => {})
   }
+
+  function advanceNightPlayer() {
+    let next = currentPlayer + 1
+    while (next <= playerCount) {
+      const player = players[next - 1]
+      if (player?.alive) break
+      next++
+    }
+
+    setNightActionReady(false)
+    if (next <= playerCount) {
+      setCurrentPlayer(next)
+      return
+    }
+
+    const finished = resolveNight()
+    if (!finished) {
+      setDay(value => value + 1)
+      setPhase("morning")
+    }
+    setTimeLeft(120)
+    setTimerRunning(false)
+    setCurrentPlayer(1)
+  }
+
+  useEffect(() => {
+    if (!aiMode || !gameId || phase === "modeSelect" || phase === "setup") return
+    void saveGameState(players, day, phase)
+  }, [aiMode, gameId, players, day, phase, currentPlayer])
+
+  useEffect(() => {
+    if (!aiMode || !gameId || phase !== "night") return
+    if (playerAssignments[currentPlayer] === "rivaran") return
+
+    const key = `werewolf:${gameId}:${day}:${currentPlayer}`
+    const poll = async () => {
+      const response = await fetch("/api/game", { cache: "no-store" }).catch(() => null)
+      if (!response?.ok) return
+      const state = await response.json()
+      const action = state.aiActions?.[key]
+      if (!action || processedAiActionRef.current === key) return
+      processedAiActionRef.current = key
+
+      const targetNumber = action.targetPlayer as number | undefined
+      const roleId = players[currentPlayer - 1]?.role.id
+      if (action.action === "attack" && targetNumber) {
+        setWolfTarget(targetNumber)
+        setWolfDecider(currentPlayer)
+      } else if (action.action === "guard" && targetNumber) {
+        setGuardTargets(previous => ({ ...previous, [currentPlayer]: targetNumber }))
+        setLastGuardTarget(previous => ({ ...previous, [currentPlayer]: targetNumber }))
+      } else if (action.action === "inspect" && targetNumber) {
+        const targetRole = players[targetNumber - 1]?.role.id
+        const result = targetRole === "werewolf" ? "black" : "white"
+        setSeerToday(previous => ({ ...previous, [currentPlayer]: { target: targetNumber, result } }))
+        setSeerResults(previous => ({
+          ...previous,
+          [currentPlayer]: { ...(previous[currentPlayer] ?? {}), [targetNumber]: result },
+        }))
+        setSeerActed(previous => ({ ...previous, [currentPlayer]: true }))
+      }
+
+      if (["villager", "madman", "medium", "werewolf", "knight", "seer"].includes(roleId ?? "")) {
+        window.setTimeout(advanceNightPlayer, 700)
+      }
+    }
+
+    void poll()
+    const interval = window.setInterval(poll, 1500)
+    return () => window.clearInterval(interval)
+  }, [aiMode, gameId, phase, day, currentPlayer, playerAssignments, players])
 
   // ゲームスタート関数
   function startGame() {
@@ -814,6 +888,7 @@ export function useGameState() {
     canShowNightButton,
     buildResults,
     getVisiblePlayers,
+    advanceNightPlayer,
     resolveNight,
     judgeAfterExecution,
     buildNightResults,

@@ -101,6 +101,7 @@ export function useOneNightState() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioResolveRef = useRef<(() => void) | null>(null)
   const discussionEndedRef = useRef(false)
+  const processedAiActionRef = useRef("")
 
   // =========== COMPUTED ===========
 
@@ -143,6 +144,37 @@ export function useOneNightState() {
       }),
     }).catch(() => {})
   }, [aiMode, gameId, playerAssignments, players, originalPlayers, centerCards, privateInfo, phase, currentPlayer])
+
+  useEffect(() => {
+    if (!aiMode || !gameId || phase !== "night") return
+    if (playerAssignments[currentPlayer] === "rivaran") return
+
+    const key = `onenight:${gameId}:0:${currentPlayer}`
+    const poll = async () => {
+      const response = await fetch("/api/game", { cache: "no-store" }).catch(() => null)
+      if (!response?.ok) return
+      const state = await response.json()
+      const action = state.aiActions?.[key]
+      if (!action || processedAiActionRef.current === key) return
+      processedAiActionRef.current = key
+
+      const targetNumber = action.targetPlayer as number | undefined
+      if (action.action === "swap" && targetNumber) {
+        handleRobberSelect(targetNumber)
+      } else if (action.action === "inspect" && targetNumber) {
+        handleSeerTypeSelect("player")
+        handleSeerPlayerSelect(targetNumber)
+      } else if (action.action === "inspect_center") {
+        handleSeerTypeSelect("center")
+      }
+
+      window.setTimeout(nextNightPlayer, 700)
+    }
+
+    void poll()
+    const interval = window.setInterval(poll, 1500)
+    return () => window.clearInterval(interval)
+  }, [aiMode, gameId, phase, currentPlayer, playerAssignments])
 
   // =========== SETUP HELPERS ===========
 

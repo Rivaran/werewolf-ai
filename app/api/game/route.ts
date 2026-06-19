@@ -4,9 +4,23 @@ import { getSupabase } from "@/lib/supabase"
 export async function POST(req: NextRequest) {
   const supabase = getSupabase()
   const body = await req.json()
+  const { data: current } = await supabase
+    .from("werewolf_game_state")
+    .select("data")
+    .eq("id", "current")
+    .maybeSingle()
+  const previous = current?.data ?? {}
+  const merged = {
+    ...body,
+    aiActions: body.aiActions ?? previous.aiActions ?? {},
+    privateInfo: {
+      ...(previous.privateInfo ?? {}),
+      ...(body.privateInfo ?? {}),
+    },
+  }
   const { error } = await supabase
     .from("werewolf_game_state")
-    .upsert({ id: "current", data: body, updated_at: new Date().toISOString() })
+    .upsert({ id: "current", data: merged, updated_at: new Date().toISOString() })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

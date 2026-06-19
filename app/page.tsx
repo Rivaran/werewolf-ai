@@ -125,6 +125,7 @@ export default function Page() {
     nextPlayer,
     judgeAfterExecution,
     resolveNight,
+    advanceNightPlayer,
     buildNightResults,
     buildMediumResults,
     mediumResults,
@@ -647,31 +648,7 @@ export default function Page() {
   }
 
   if (phase === "night") {
-
-    const advanceNightPlayer = () => {
-      let next = currentPlayer + 1
-      while (next <= playerCount) {
-        const p = players[next - 1]
-        if (p && p.alive) break
-        next++
-      }
-      setCurrentPlayer(next)
-      setNightActionReady(false)
-      if (next > playerCount) {
-        const finished = resolveNight()
-        if (!finished) {
-          setDay(d => d + 1)
-          setCurrentPlayer(1)
-          setPhase("morning")
-        }
-        setTimeLeft(120)
-        setTimerRunning(false)
-        setNightActionReady(false)
-        setCurrentPlayer(1)
-      }
-    }
-
-    if (aiMode && currentPlayer !== 1) {
+    if (aiMode && playerAssignments[currentPlayer] !== "rivaran") {
       const aiPlayer = players[currentPlayer - 1]
       if (aiPlayer) {
         const roleId = aiPlayer.role.id
@@ -695,107 +672,39 @@ export default function Page() {
 
               {(roleId === "villager" || roleId === "madman") && (
                 <>
-                  <p style={{ opacity: 0.8, marginBottom: 20 }}>夜の行動なし</p>
-                  <button onClick={advanceNightPlayer} className={theme === "mama" ? styles.blueButtonMama : styles.blueButton}>
-                    次のプレイヤー
-                  </button>
+                  <p style={{ opacity: 0.8, marginBottom: 20 }}>MCPからの行動完了を待っています</p>
                 </>
               )}
 
               {roleId === "werewolf" && wolfTarget === null && (
                 <>
-                  <p style={{ opacity: 0.8, marginBottom: 8 }}>ThreadLogicsを確認して襲撃先を入力</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginTop: 12 }}>
-                    {players.map((p, i) => {
-                      const num = i + 1
-                      if (num === currentPlayer) return null
-                      if (!players[i]?.alive) return null
-                      if (players[i]?.role?.id === "werewolf") return null
-                      return (
-                        <button
-                          key={num}
-                          onClick={() => { setWolfTarget(num); setWolfDecider(currentPlayer) }}
-                          style={{ padding: "14px 20px", fontSize: 18, borderRadius: 14, border: "1px solid rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.15)", color: "white", backdropFilter: "blur(6px)", cursor: "pointer" }}
-                        >
-                          プレイヤー {num}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <p style={{ opacity: 0.8, marginBottom: 8 }}>MCPから襲撃先を受信しています</p>
                 </>
               )}
 
               {roleId === "werewolf" && wolfTarget !== null && (
                 <>
                   <p style={{ fontSize: 20, marginBottom: 16 }}>襲撃先：プレイヤー {wolfTarget}</p>
-                  <button onClick={advanceNightPlayer} className={theme === "mama" ? styles.blueButtonMama : styles.blueButton}>
-                    次のプレイヤー
-                  </button>
+                  <p style={{ opacity: 0.75 }}>自動で次へ進みます</p>
                 </>
               )}
 
               {roleId === "knight" && !guardTargets[currentPlayer] && (
                 <>
-                  <p style={{ opacity: 0.8, marginBottom: 8 }}>ThreadLogicsを確認して護衛先を入力</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginTop: 12 }}>
-                    {players.map((p, i) => {
-                      const num = i + 1
-                      if (num === currentPlayer) return null
-                      if (!players[i]?.alive) return null
-                      return (
-                        <button
-                          key={num}
-                          disabled={lastGuardTarget[currentPlayer] === num}
-                          onClick={() => {
-                            setGuardTargets(prev => ({ ...prev, [currentPlayer]: num }))
-                            setLastGuardTarget(prev => ({ ...prev, [currentPlayer]: num }))
-                          }}
-                          style={{ padding: "14px 20px", fontSize: 18, borderRadius: 14, border: "1px solid rgba(255,255,255,0.35)", background: lastGuardTarget[currentPlayer] === num ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.15)", color: lastGuardTarget[currentPlayer] === num ? "rgba(255,255,255,0.4)" : "white", backdropFilter: "blur(6px)", cursor: lastGuardTarget[currentPlayer] === num ? "not-allowed" : "pointer" }}
-                        >
-                          プレイヤー {num}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <p style={{ opacity: 0.8, marginBottom: 8 }}>MCPから護衛先を受信しています</p>
                 </>
               )}
 
               {roleId === "knight" && guardTargets[currentPlayer] && (
                 <>
                   <p style={{ fontSize: 20, marginBottom: 16 }}>護衛先：プレイヤー {guardTargets[currentPlayer]}</p>
-                  <button onClick={advanceNightPlayer} className={theme === "mama" ? styles.blueButtonMama : styles.blueButton}>
-                    次のプレイヤー
-                  </button>
+                  <p style={{ opacity: 0.75 }}>自動で次へ進みます</p>
                 </>
               )}
 
               {roleId === "seer" && !seerActed[currentPlayer] && (
                 <>
-                  <p style={{ opacity: 0.8, marginBottom: 8 }}>ThreadLogicsを確認して占い先を入力</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginTop: 12 }}>
-                    {players.map((p, i) => {
-                      const num = i + 1
-                      if (num === currentPlayer) return null
-                      if (!players[i]?.alive) return null
-                      if (seerResults[currentPlayer]?.[num]) return null
-                      return (
-                        <button
-                          key={num}
-                          onClick={() => {
-                            const target = players[i]?.role
-                            const seerTarget = players[i]?.id
-                            const result = target?.id === "werewolf" ? "black" : "white"
-                            setSeerToday(prev => ({ ...prev, [currentPlayer]: { target: num, result } }))
-                            setSeerResults(prev => ({ ...prev, [currentPlayer]: { ...(prev[currentPlayer] || {}), [seerTarget!]: result } }))
-                            setSeerActed(prev => ({ ...prev, [currentPlayer]: true }))
-                          }}
-                          style={{ padding: "14px 20px", fontSize: 18, borderRadius: 14, border: "1px solid rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.15)", color: "white", backdropFilter: "blur(6px)", cursor: "pointer" }}
-                        >
-                          プレイヤー {num}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <p style={{ opacity: 0.8, marginBottom: 8 }}>MCPから占い先を受信しています</p>
                 </>
               )}
 
@@ -804,9 +713,7 @@ export default function Page() {
                   <p style={{ fontSize: 20, marginBottom: 16 }}>
                     占い結果：プレイヤー {seerToday[currentPlayer]?.target} は{seerToday[currentPlayer]?.result === "black" ? "人狼" : "人狼ではない"}
                   </p>
-                  <button onClick={advanceNightPlayer} className={theme === "mama" ? styles.blueButtonMama : styles.blueButton}>
-                    次のプレイヤー
-                  </button>
+                  <p style={{ opacity: 0.75 }}>自動で次へ進みます</p>
                 </>
               )}
             </div>
@@ -1784,10 +1691,10 @@ export default function Page() {
             <div className={`${styles.flexCenterColumn} ${styles.gap16}`}>
 
               <div className={theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
-                プレイヤー {currentPlayer}{aiMode && currentPlayer !== 1 ? "（AI）" : ""}
+                プレイヤー {currentPlayer}{aiMode && playerAssignments[currentPlayer] !== "rivaran" ? "（AI）" : ""}
               </div>
 
-              {aiMode && currentPlayer !== 1 ? (
+              {aiMode && playerAssignments[currentPlayer] !== "rivaran" ? (
                 <>
                   <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 16, textAlign: "center" }}>
                     MCPで役職を確認してください

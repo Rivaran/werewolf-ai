@@ -335,15 +335,16 @@ export default function OneNightWolfPage() {
             <div className={s.theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
               プレイヤー {s.currentPlayer}{s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" ? "（AI）" : ""}
             </div>
-            {s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" && (
-              <p style={{ fontSize: 15, opacity: 0.8 }}>MCPで役職を確認して夜行動を決めてください</p>
+            {s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" ? (
+              <p style={{ fontSize: 15, opacity: 0.8 }}>MCPから夜行動を受信しています</p>
+            ) : (
+              <button
+                onClick={s.beginNightAction}
+                className={s.theme === "mama" ? styles.orangeButtonMama : styles.orangeButton}
+              >
+                画面タップ
+              </button>
             )}
-            <button
-              onClick={s.beginNightAction}
-              className={s.theme === "mama" ? styles.orangeButtonMama : styles.orangeButton}
-            >
-              画面タップ
-            </button>
           </div>
         ) : (
           <div
