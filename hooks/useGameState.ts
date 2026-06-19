@@ -506,6 +506,7 @@ export function useGameState() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        mode: "werewolf",
         players: statePlayers.map(p => p ? {
           id: p.id,
           role: { id: p.role.id, name: p.role.name },

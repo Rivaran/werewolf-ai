@@ -9,11 +9,31 @@ type Player = {
 } | null
 
 type GameState = {
+  mode?: "werewolf" | "onenight" | "wordwolf"
   gameId?: string
   playerAssignments?: Record<number, string>
-  players: Player[]
+  players?: Player[]
+  originalPlayers?: Player[]
+  centerCards?: Array<{ id: string; name: string }>
+  privateInfo?: Record<number, string>
+  participants?: Array<{
+    id: number
+    role: "villager" | "werewolf" | "fox"
+    word: { text: string; reading?: string }
+    alive: boolean
+  }>
   day: number
   phase: string
+}
+
+function getMode(state: GameState) {
+  return state.mode ?? "werewolf"
+}
+
+function modeLabel(mode: ReturnType<typeof getMode>) {
+  if (mode === "onenight") return "一夜人狼"
+  if (mode === "wordwolf") return "言葉人狼"
+  return "人狼ゲーム"
 }
 
 async function loadState(): Promise<GameState | null> {
@@ -37,7 +57,7 @@ export function createWerewolfMcpServer() {
   server.registerTool(
     "get_my_role",
     {
-      description: "自分の役職を確認する。ゲーム開始後、自分のプレイヤー番号を指定する。",
+      description: "現在のゲームモードで、自分だけの役職・お題・能力結果を確認する。",
       inputSchema: {
         player_number: z.number().int().positive().describe("プレイヤー番号"),
       },
@@ -45,11 +65,43 @@ export function createWerewolfMcpServer() {
     async ({ player_number }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
+      const mode = getMode(state)
 
-      const player = state.players[player_number - 1]
+      if (mode === "wordwolf") {
+        const participant = state.participants?.find(item => item.id === player_number)
+        if (!participant) return textResult(`プレイヤー${player_number}は存在しません。`)
+        const reading = participant.word.reading ? `（${participant.word.reading}）` : ""
+        return textResult(
+          `ゲームモード: 言葉人狼\nあなた（プレイヤー${player_number}）のお題は「${participant.word.text}」${reading}です。\n` +
+          "自分が多数派・少数派・キツネのどれかは公開されません。会話から推理してください。\n" +
+          (participant.alive ? "あなたは生存中です。" : "あなたは追放されています。")
+        )
+      }
+
+      if (mode === "onenight") {
+        const original = state.originalPlayers?.[player_number - 1]
+        if (!original) return textResult(`プレイヤー${player_number}は存在しません。`)
+
+        const allies = original.role.id === "werewolf"
+          ? state.originalPlayers
+              ?.filter((item) => item && item.id !== player_number && item.role.id === "werewolf")
+              .map(item => `プレイヤー${item!.id}`) ?? []
+          : []
+        const details = [
+          `ゲームモード: 一夜人狼`,
+          `あなた（プレイヤー${player_number}）の最初の役職は「${original.role.name}」です。`,
+          original.role.id === "werewolf"
+            ? (allies.length > 0 ? `人狼の仲間: ${allies.join("、")}` : "あなたは一匹狼です。")
+            : null,
+          state.privateInfo?.[player_number] ?? null,
+        ].filter((line): line is string => Boolean(line))
+        return textResult(details.join("\n"))
+      }
+
+      const player = state.players?.[player_number - 1]
       if (!player) return textResult(`プレイヤー${player_number}は存在しません。`)
 
-      const alive = state.players
+      const alive = (state.players ?? [])
         .filter((item): item is NonNullable<Player> => item !== null && item.alive)
         .map((item) => `プレイヤー${item.id}`)
         .join("、")
@@ -65,23 +117,24 @@ export function createWerewolfMcpServer() {
   server.registerTool(
     "get_game_state",
     {
-      description: "現在のゲーム状態、フェーズ、全プレイヤーの生死を取得する。",
+      description: "現在のゲームモード、フェーズ、全プレイヤーの生死を取得する。秘密情報は含まない。",
       inputSchema: {},
     },
     async () => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
+      const mode = getMode(state)
+      const publicPlayers = mode === "wordwolf"
+        ? (state.participants ?? []).map(item => ({ id: item.id, alive: item.alive }))
+        : (state.players ?? []).filter((item): item is NonNullable<Player> => item !== null)
 
       const lines = [
+        `ゲームモード: ${modeLabel(mode)}`,
         `フェーズ: ${state.phase}`,
-        `${state.day + 1}日目`,
+        mode === "onenight" ? "一夜勝負" : `${mode === "werewolf" ? state.day + 1 : state.day}日目`,
         "",
         "プレイヤー一覧:",
-        ...state.players
-          .map((player) =>
-            player ? `  プレイヤー${player.id}: ${player.alive ? "生存" : "死亡"}` : null
-          )
-          .filter((line): line is string => line !== null),
+        ...publicPlayers.map(player => `  プレイヤー${player.id}: ${player.alive ? "生存" : "死亡・追放"}`),
       ]
       return textResult(lines.join("\n"))
     }
@@ -97,8 +150,9 @@ export function createWerewolfMcpServer() {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
 
-      const alive = state.players
-        .filter((item): item is NonNullable<Player> => item !== null && item.alive)
+      const candidates = getMode(state) === "wordwolf" ? state.participants ?? [] : state.players ?? []
+      const alive = candidates
+        .filter((item): item is NonNullable<typeof item> => item !== null && item.alive)
         .map((item) => `プレイヤー${item.id}`)
       return textResult(`生存中: ${alive.join("、")}（${alive.length}人）`)
     }

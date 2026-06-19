@@ -6,12 +6,13 @@ import { CHARACTERS, CharacterId, DiscussionLog, DiscussionMessage } from "@/typ
 type Props = {
   gameId: string
   day: number
-  morningDeath: number | null
+  morningDeath?: number | null
   playerAssignments: Record<number, string>
   onEndDiscussion: () => void
+  title?: string
 }
 
-export default function DiscussionChat({ gameId, day, morningDeath, playerAssignments, onEndDiscussion }: Props) {
+export default function DiscussionChat({ gameId, day, morningDeath = null, playerAssignments, onEndDiscussion, title }: Props) {
   const [messages, setMessages] = useState<DiscussionMessage[]>([])
   const [inputText, setInputText] = useState("")
   const [posting, setPosting] = useState(false)
@@ -93,7 +94,7 @@ export default function DiscussionChat({ gameId, day, morningDeath, playerAssign
         }}
       >
         <div>
-          <div style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}>{day + 1}日目の議論</div>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}>{title ?? `${day + 1}日目の議論`}</div>
           <div style={{ fontSize: 12, color: "#888" }}>発言 {messages.length}件</div>
         </div>
         <button

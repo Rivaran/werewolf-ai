@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { DndContext } from "@dnd-kit/core"
 import RoleCard from "@/components/RoleCard"
 import PlayerSlot from "@/components/PlayerSlot"
+import AiModeControls from "@/components/AiModeControls"
+import DiscussionChat from "@/components/DiscussionChat"
 import styles from "@/app/page.module.css"
 import { useOneNightState } from "@/hooks/useOneNightState"
 import { useWakeLock } from "@/hooks/useWakeLock"
@@ -236,6 +238,17 @@ export default function OneNightWolfPage() {
           </div>
         </DndContext>
 
+        <AiModeControls
+          enabled={s.aiMode}
+          playerCount={s.playerCount}
+          assignments={s.playerAssignments}
+          onEnabledChange={(enabled) => {
+            if (enabled && s.playerCount > 5) s.setPlayerCount(5)
+            s.setAiMode(enabled)
+          }}
+          onAssignmentsChange={s.setPlayerAssignments}
+        />
+
         <button
           onClick={s.startGame}
           className={s.theme === "mama" ? styles.oneNightStartButtonMama : styles.oneNightStartButtonAi}
@@ -320,8 +333,11 @@ export default function OneNightWolfPage() {
         {!s.nightActionReady ? (
           <div className={`${styles.flexCenterColumn} ${styles.gap16}`} style={{ marginTop: 170 + mamaNightOffset }}>
             <div className={s.theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
-              プレイヤー {s.currentPlayer}
+              プレイヤー {s.currentPlayer}{s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" ? "（AI）" : ""}
             </div>
+            {s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" && (
+              <p style={{ fontSize: 15, opacity: 0.8 }}>MCPで役職を確認して夜行動を決めてください</p>
+            )}
             <button
               onClick={s.beginNightAction}
               className={s.theme === "mama" ? styles.orangeButtonMama : styles.orangeButton}
@@ -529,6 +545,18 @@ export default function OneNightWolfPage() {
         )}
         {renderRoleSummaryButton()}
       </div>
+    )
+  }
+
+  if (s.phase === "discussion" && s.aiMode) {
+    return (
+      <DiscussionChat
+        gameId={s.gameId}
+        day={0}
+        playerAssignments={s.playerAssignments}
+        onEndDiscussion={s.endDiscussion}
+        title="一夜人狼の議論"
+      />
     )
   }
 

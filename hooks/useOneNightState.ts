@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
 import { DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { Player, Role } from "@/types/player"
 
@@ -82,6 +82,12 @@ export function useOneNightState() {
   const [isPeace, setIsPeace] = useState(false)
   const [originalPlayers, setOriginalPlayers] = useState<Player[]>([])
   const [robberPlayerNum, setRobberPlayerNum] = useState<number | null>(null)
+  const [privateInfo, setPrivateInfo] = useState<Record<number, string>>({})
+
+  // AI mode
+  const [aiMode, setAiMode] = useState(false)
+  const [gameId, setGameId] = useState("")
+  const [playerAssignments, setPlayerAssignments] = useState<Record<number, string>>({})
 
   // discussion / timer
   const [timeLeft, setTimeLeft] = useState(180)
@@ -108,6 +114,35 @@ export function useOneNightState() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+
+  useEffect(() => {
+    if (!aiMode || !gameId || phase === "setup") return
+
+    void fetch("/api/game", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "onenight",
+        gameId,
+        playerAssignments,
+        players: players.map(player => player ? {
+          id: player.id,
+          role: { id: player.role.id, name: player.role.name },
+          alive: player.alive,
+        } : null),
+        originalPlayers: originalPlayers.map(player => ({
+          id: player.id,
+          role: { id: player.role.id, name: player.role.name },
+          alive: player.alive,
+        })),
+        centerCards: centerCards.map(role => ({ id: role.id, name: role.name })),
+        privateInfo,
+        day: 0,
+        phase,
+        currentPlayer,
+      }),
+    }).catch(() => {})
+  }, [aiMode, gameId, playerAssignments, players, originalPlayers, centerCards, privateInfo, phase, currentPlayer])
 
   // =========== SETUP HELPERS ===========
 
@@ -214,6 +249,10 @@ export function useOneNightState() {
       alert("配役をすべて選択してください")
       return
     }
+    if (aiMode && Object.keys(playerAssignments).length < playerCount) {
+      alert("すべてのプレイヤーにキャラクターを割り当ててください")
+      return
+    }
 
     const allRoles = setupSlots.map(s => s!.role)
     const shuffled = shuffle(allRoles)
@@ -226,6 +265,7 @@ export function useOneNightState() {
     setPlayers(gamePlayers)
     setOriginalPlayers(gamePlayers.map(p => ({ ...p, role: { ...p.role } })))
     setRobberPlayerNum(null)
+    setPrivateInfo({})
     setCenterCards(center)
     setCurrentPlayer(1)
     setShowRole(false)
@@ -248,6 +288,8 @@ export function useOneNightState() {
     setDiscussionReady(false)
     setDiscussionEnded(false)
     discussionEndedRef.current = false
+
+    setGameId(Date.now().toString())
 
     setPhase("night")
 
@@ -321,6 +363,10 @@ export function useOneNightState() {
     const targetRole = players[targetIdx]!.role
     setRobberTarget(targetNum)
     setRobberNewRole(targetRole)
+    setPrivateInfo(prev => ({
+      ...prev,
+      [currentPlayer]: `プレイヤー${targetNum}と交換し、現在の役職は「${targetRole.name}」です。`,
+    }))
     setPlayers(prev => {
       const next = [...prev]
       next[myIdx]    = { ...next[myIdx]!,    role: targetRole }
@@ -337,12 +383,20 @@ export function useOneNightState() {
     setSeerChoiceType(type)
     if (type === "center") {
       setSeerCenterResult(centerCards)
+      setPrivateInfo(prev => ({
+        ...prev,
+        [currentPlayer]: `中央の2枚は「${centerCards.map(role => role.name).join("」「")}」です。`,
+      }))
     }
   }
 
   function handleSeerPlayerSelect(targetNum: number) {
     setSeerTarget(targetNum)
     setSeerResult(originalPlayers[targetNum - 1]!.role)
+    setPrivateInfo(prev => ({
+      ...prev,
+      [currentPlayer]: `プレイヤー${targetNum}を占い、役職は「${originalPlayers[targetNum - 1]!.role.name}」でした。`,
+    }))
   }
 
   function confirmSeerResult() {
@@ -477,6 +531,12 @@ export function useOneNightState() {
     isPeace,
     originalPlayers,
     robberPlayerNum,
+    privateInfo,
+
+    // AI mode
+    aiMode, setAiMode,
+    gameId,
+    playerAssignments, setPlayerAssignments,
 
     // timer / discussion
     timeLeft, timerRunning,

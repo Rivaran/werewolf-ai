@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import styles from "@/app/page.module.css"
+import AiModeControls from "@/components/AiModeControls"
+import DiscussionChat from "@/components/DiscussionChat"
 import { useWakeLock } from "@/hooks/useWakeLock"
 import {
   WORDWOLF_GENRES,
@@ -164,12 +166,42 @@ export default function WordWolfPage() {
   const [comebackRole, setComebackRole] = useState<Role | null>(null)
   const [comebackVillagerGuess, setComebackVillagerGuess] = useState("")
   const [comebackWerewolfGuess, setComebackWerewolfGuess] = useState("")
+  const [aiMode, setAiMode] = useState(false)
+  const [gameId, setGameId] = useState("")
+  const [playerAssignments, setPlayerAssignments] = useState<Record<number, string>>({})
 
   useWakeLock(phase !== "setup")
 
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
+
+  useEffect(() => {
+    if (!aiMode || !gameId || phase === "setup") return
+
+    void fetch("/api/game", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "wordwolf",
+        gameId,
+        playerAssignments,
+        participants: participants.map(participant => ({
+          id: participant.id,
+          role: participant.role,
+          word: participant.word,
+          alive: participant.alive,
+        })),
+        players: participants.map(participant => ({
+          id: participant.id,
+          alive: participant.alive,
+        })),
+        day,
+        phase,
+        currentPlayer,
+      }),
+    }).catch(() => {})
+  }, [aiMode, gameId, playerAssignments, participants, day, phase, currentPlayer])
 
   useEffect(() => {
     if (phase !== "comebackReview" || !comebackRole) return
@@ -297,6 +329,7 @@ export default function WordWolfPage() {
     setComebackVillagerGuess("")
     setComebackWerewolfGuess("")
     setShowRoleSummary(false)
+    setGameId("")
     resetRoundSelections()
   }
 
@@ -508,6 +541,10 @@ export default function WordWolfPage() {
       alert("人狼数とキツネ数の合計がプレイ人数以上にならないようにしてください")
       return
     }
+    if (aiMode && Object.keys(playerAssignments).length < playerCount) {
+      alert("すべてのプレイヤーにキャラクターを割り当ててください")
+      return
+    }
 
     const built = buildPair()
     if (!built) return
@@ -539,6 +576,7 @@ export default function WordWolfPage() {
     }))
 
     setParticipants(nextParticipants)
+    setGameId(Date.now().toString())
     setVillagerWord(nextVillagerWord)
     setWerewolfWord(nextWerewolfWord)
     setCurrentPlayer(1)
@@ -965,6 +1003,17 @@ export default function WordWolfPage() {
           </div>
         )}
 
+        <AiModeControls
+          enabled={aiMode}
+          playerCount={playerCount}
+          assignments={playerAssignments}
+          onEnabledChange={(enabled) => {
+            if (enabled && playerCount > 5) setPlayerCount(5)
+            setAiMode(enabled)
+          }}
+          onAssignmentsChange={setPlayerAssignments}
+        />
+
         <button
           onClick={() => void startGame()}
           className={theme === "mama" ? styles.wordWolfStartButtonMama : styles.wordWolfStartButtonAi}
@@ -1040,6 +1089,7 @@ export default function WordWolfPage() {
   if (phase === "distribution") {
     const participant = participants[currentPlayer - 1]
     if (!participant) return null
+    const isAiPlayer = aiMode && playerAssignments[currentPlayer] !== "rivaran"
 
     return (
       <div className={styles.screenBase} style={{ backgroundImage: `url(/image/${theme}/bg_night.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", position: "relative" }}>
@@ -1049,10 +1099,21 @@ export default function WordWolfPage() {
 
         {!showWord ? (
           <div className={`${styles.flexCenterColumn} ${styles.gap16}`}>
-            <div className={theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>プレイヤー {currentPlayer}</div>
-            <button onClick={() => setShowWord(true)} className={theme === "mama" ? styles.orangeButtonMama : styles.orangeButton}>
-              画面タップ
-            </button>
+            <div className={theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
+              プレイヤー {currentPlayer}{isAiPlayer ? "（AI）" : ""}
+            </div>
+            {isAiPlayer ? (
+              <>
+                <p style={{ fontSize: 16, opacity: 0.8 }}>MCPでキーワードを確認してください</p>
+                <button onClick={() => void moveToNextPlayer()} className={theme === "mama" ? styles.blueButtonMama : styles.blueButton}>
+                  確認済
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setShowWord(true)} className={theme === "mama" ? styles.orangeButtonMama : styles.orangeButton}>
+                画面タップ
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, textAlign: "center", padding: "0 20px" }}>
@@ -1067,6 +1128,18 @@ export default function WordWolfPage() {
         )}
         {summaryButton}
       </div>
+    )
+  }
+
+  if (phase === "discussion" && aiMode) {
+    return (
+      <DiscussionChat
+        gameId={gameId}
+        day={day}
+        playerAssignments={playerAssignments}
+        onEndDiscussion={() => void endDiscussion()}
+        title={`言葉人狼 ${day}日目の議論`}
+      />
     )
   }
 
