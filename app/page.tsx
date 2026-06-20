@@ -10,6 +10,7 @@ import AliveCounter from "@/components/AliveCounter"
 import RoleCard from "@/components/RoleCard"
 import PlayerSlot from "@/components/PlayerSlot"
 import DiscussionChat from "@/components/DiscussionChat"
+import { buildDefaultAssignments } from "@/components/AiModeControls"
 import styles from "./page.module.css"
 import { useGameState } from "@/hooks/useGameState"
 import { useWakeLock } from "@/hooks/useWakeLock"
@@ -2091,7 +2092,11 @@ export default function Page() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, marginBottom: 4 }}>
         <button
-          onClick={() => setAiMode(!aiMode)}
+          onClick={() => {
+            const enabled = !aiMode
+            setAiMode(enabled)
+            if (enabled) setPlayerAssignments(buildDefaultAssignments(playerCount))
+          }}
           style={{
             padding: "10px 20px",
             fontSize: 15,
