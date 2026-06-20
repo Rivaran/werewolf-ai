@@ -206,6 +206,24 @@ export function createWerewolfMcpServer() {
         "プレイヤー一覧:",
         ...publicPlayers.map(player => `  ${getPlayerName(state, player.id)}: ${player.alive ? "生存" : "死亡・追放"}`),
       ]
+
+      if (state.gameId) {
+        const { data: messages } = await getSupabase()
+          .from("werewolf_discussion_messages")
+          .select("player_number, message, day, timestamp")
+          .eq("game_id", state.gameId)
+          .eq("day", state.day)
+          .order("timestamp", { ascending: true })
+
+        lines.push("", "現在の議論ログ:")
+        if (!messages?.length) {
+          lines.push("  まだ発言はありません。")
+        } else {
+          messages.forEach(message => {
+            lines.push(`  ${getPlayerName(state, message.player_number)}: ${message.message}`)
+          })
+        }
+      }
       return textResult(lines.join("\n"))
     }
   )
