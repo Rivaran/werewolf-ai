@@ -1,6 +1,6 @@
 "use client"
 
-import { CHARACTERS } from "@/types/discussion"
+import { buildDefaultAssignments, CHARACTERS } from "@/types/discussion"
 
 type Props = {
   enabled: boolean
@@ -8,14 +8,6 @@ type Props = {
   assignments: Record<number, string>
   onEnabledChange: (enabled: boolean) => void
   onAssignmentsChange: (assignments: Record<number, string>) => void
-}
-
-const characterIds = Object.keys(CHARACTERS)
-
-export function buildDefaultAssignments(playerCount: number) {
-  return Object.fromEntries(
-    characterIds.slice(0, playerCount).map((characterId, index) => [index + 1, characterId])
-  )
 }
 
 export default function AiModeControls({

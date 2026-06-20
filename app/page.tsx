@@ -10,11 +10,10 @@ import AliveCounter from "@/components/AliveCounter"
 import RoleCard from "@/components/RoleCard"
 import PlayerSlot from "@/components/PlayerSlot"
 import DiscussionChat from "@/components/DiscussionChat"
-import { buildDefaultAssignments } from "@/components/AiModeControls"
 import styles from "./page.module.css"
 import { useGameState } from "@/hooks/useGameState"
 import { useWakeLock } from "@/hooks/useWakeLock"
-import { CHARACTERS } from "@/types/discussion"
+import { buildDefaultAssignments, CHARACTERS } from "@/types/discussion"
 
 const ROLE_SUMMARY_ORDER = [
   { id: "werewolf", label: "人狼" },
@@ -135,6 +134,16 @@ export default function Page() {
     getVisiblePlayers,
     canShowNightButton,
   } = useGameState()
+
+  const fallbackCharacterIds = ["rivaran", "fin", "gear", "navia", "ray"]
+  const getCharacterId = (playerNumber: number) =>
+    playerAssignments[playerNumber] ?? fallbackCharacterIds[playerNumber - 1]
+  const getPlayerName = (playerNumber: number | undefined) => {
+    if (!playerNumber) return "未選択"
+    const character = CHARACTERS[getCharacterId(playerNumber) as keyof typeof CHARACTERS]
+    return character?.name ?? `プレイヤー${playerNumber}`
+  }
+  const isAiPlayer = (playerNumber: number) => aiMode && getCharacterId(playerNumber) !== "rivaran"
 
   useWakeLock(phase !== "modeSelect" && phase !== "setup")
 
@@ -649,7 +658,7 @@ export default function Page() {
   }
 
   if (phase === "night") {
-    if (aiMode && playerAssignments[currentPlayer] !== "rivaran") {
+    if (isAiPlayer(currentPlayer)) {
       const aiPlayer = players[currentPlayer - 1]
       if (aiPlayer) {
         const roleId = aiPlayer.role.id
@@ -668,7 +677,7 @@ export default function Page() {
 
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 20, opacity: 0.75, marginBottom: 16 }}>
-                プレイヤー {currentPlayer}（AI）
+                {getPlayerName(currentPlayer)}（AI）
               </div>
 
               {(roleId === "villager" || roleId === "madman") && (
@@ -685,7 +694,7 @@ export default function Page() {
 
               {roleId === "werewolf" && wolfTarget !== null && (
                 <>
-                  <p style={{ fontSize: 20, marginBottom: 16 }}>襲撃先：プレイヤー {wolfTarget}</p>
+                  <p style={{ fontSize: 20, marginBottom: 16 }}>襲撃先：{getPlayerName(wolfTarget)}</p>
                   <p style={{ opacity: 0.75 }}>自動で次へ進みます</p>
                 </>
               )}
@@ -698,7 +707,7 @@ export default function Page() {
 
               {roleId === "knight" && guardTargets[currentPlayer] && (
                 <>
-                  <p style={{ fontSize: 20, marginBottom: 16 }}>護衛先：プレイヤー {guardTargets[currentPlayer]}</p>
+                  <p style={{ fontSize: 20, marginBottom: 16 }}>護衛先：{getPlayerName(guardTargets[currentPlayer])}</p>
                   <p style={{ opacity: 0.75 }}>自動で次へ進みます</p>
                 </>
               )}
@@ -712,7 +721,7 @@ export default function Page() {
               {roleId === "seer" && seerActed[currentPlayer] && (
                 <>
                   <p style={{ fontSize: 20, marginBottom: 16 }}>
-                    占い結果：プレイヤー {seerToday[currentPlayer]?.target} は{seerToday[currentPlayer]?.result === "black" ? "人狼" : "人狼ではない"}
+                    占い結果：{getPlayerName(seerToday[currentPlayer]?.target)} は{seerToday[currentPlayer]?.result === "black" ? "人狼" : "人狼ではない"}
                   </p>
                   <p style={{ opacity: 0.75 }}>自動で次へ進みます</p>
                 </>
@@ -1692,10 +1701,10 @@ export default function Page() {
             <div className={`${styles.flexCenterColumn} ${styles.gap16}`}>
 
               <div className={theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
-                プレイヤー {currentPlayer}{aiMode && playerAssignments[currentPlayer] !== "rivaran" ? "（AI）" : ""}
+                {aiMode ? getPlayerName(currentPlayer) : `プレイヤー ${currentPlayer}`}{isAiPlayer(currentPlayer) ? "（AI）" : ""}
               </div>
 
-              {aiMode && playerAssignments[currentPlayer] !== "rivaran" ? (
+              {isAiPlayer(currentPlayer) ? (
                 <>
                   <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 16, textAlign: "center" }}>
                     MCPで役職を確認してください

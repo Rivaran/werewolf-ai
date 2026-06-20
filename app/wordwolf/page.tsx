@@ -14,6 +14,7 @@ import {
   type WordWolfPair,
   type WordWolfWord,
 } from "@/data/wordwolfTopics"
+import { buildRandomAssignments, CHARACTERS } from "@/types/discussion"
 
 type Theme = "mama" | "ai"
 type SourceMode = "genre" | "gm" | "random"
@@ -169,6 +170,15 @@ export default function WordWolfPage() {
   const [aiMode, setAiMode] = useState(false)
   const [gameId, setGameId] = useState("")
   const [playerAssignments, setPlayerAssignments] = useState<Record<number, string>>({})
+
+  const fallbackCharacterIds = ["rivaran", "fin", "gear", "navia", "ray"]
+  const getCharacterId = (playerNumber: number) =>
+    playerAssignments[playerNumber] ?? fallbackCharacterIds[playerNumber - 1]
+  const getPlayerName = (playerNumber: number) => {
+    if (!aiMode) return `プレイヤー${playerNumber}`
+    return CHARACTERS[getCharacterId(playerNumber) as keyof typeof CHARACTERS]?.name ?? `プレイヤー${playerNumber}`
+  }
+  const isAiControlled = (playerNumber: number) => aiMode && getCharacterId(playerNumber) !== "rivaran"
 
   useWakeLock(phase !== "setup")
 
@@ -541,10 +551,7 @@ export default function WordWolfPage() {
       alert("人狼数とキツネ数の合計がプレイ人数以上にならないようにしてください")
       return
     }
-    if (aiMode && Object.keys(playerAssignments).length < playerCount) {
-      alert("すべてのプレイヤーにキャラクターを割り当ててください")
-      return
-    }
+    const gameAssignments = aiMode ? buildRandomAssignments(playerCount) : playerAssignments
 
     const built = buildPair()
     if (!built) return
@@ -576,6 +583,7 @@ export default function WordWolfPage() {
     }))
 
     setParticipants(nextParticipants)
+    setPlayerAssignments(gameAssignments)
     setGameId(Date.now().toString())
     setVillagerWord(nextVillagerWord)
     setWerewolfWord(nextWerewolfWord)
@@ -1089,7 +1097,7 @@ export default function WordWolfPage() {
   if (phase === "distribution") {
     const participant = participants[currentPlayer - 1]
     if (!participant) return null
-    const isAiPlayer = aiMode && playerAssignments[currentPlayer] !== "rivaran"
+    const isAiPlayer = isAiControlled(currentPlayer)
 
     return (
       <div className={styles.screenBase} style={{ backgroundImage: `url(/image/${theme}/bg_night.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", position: "relative" }}>
@@ -1100,7 +1108,7 @@ export default function WordWolfPage() {
         {!showWord ? (
           <div className={`${styles.flexCenterColumn} ${styles.gap16}`}>
             <div className={theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
-              プレイヤー {currentPlayer}{isAiPlayer ? "（AI）" : ""}
+              {getPlayerName(currentPlayer)}{isAiPlayer ? "（AI）" : ""}
             </div>
             {isAiPlayer ? (
               <>
@@ -1205,7 +1213,7 @@ export default function WordWolfPage() {
                 }}
                 style={{ minWidth: 160, padding: "14px 18px", fontSize: 20, borderRadius: 12, border: active ? "3px solid #ff6b6b" : "1px solid rgba(255,255,255,0.25)", background: active ? "rgba(255,107,107,0.72)" : "rgba(255,255,255,0.6)", color: "#222", fontWeight: "bold", cursor: "pointer" }}
               >
-                プレイヤー{participant.id}
+                {getPlayerName(participant.id)}
               </button>
             )
           })}
@@ -1213,7 +1221,7 @@ export default function WordWolfPage() {
 
         {!tieMode && selectedParticipant && (
           <div style={{ textAlign: "center", marginTop: 10 }}>
-            <p>プレイヤー{selectedParticipant.id} を追放しますか？</p>
+            <p>{getPlayerName(selectedParticipant.id)}を追放しますか？</p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 14 }}>
               <button onClick={() => void executeSelectedPlayer()} style={{ padding: "10px 22px", fontSize: 16, borderRadius: 12, background: theme === "mama" ? "#6b6b6b" : "linear-gradient(135deg,#6bd4ff,#2b8cff)", border: theme === "mama" ? "2px solid #505050" : "none", color: "white", fontWeight: "bold", boxShadow: "0 6px 16px rgba(0,0,0,0.35)", cursor: "pointer" }}>
                 決定
@@ -1260,7 +1268,7 @@ export default function WordWolfPage() {
     return (
       <div style={{ backgroundImage: theme === "mama" ? `url(/image/${theme}/bg_vote.png)` : `url(/image/${theme}/bg_day.png)`, backgroundSize: theme === "mama" ? "contain" : "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", backgroundBlendMode: "darken", backgroundColor: "rgba(0,0,0,0.35)", color: "white", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, padding: "0 20px", textAlign: "center", position: "relative" }}>
         <h1 style={{ fontSize: 40, letterSpacing: 2, textShadow: "0 4px 16px rgba(0,0,0,0.6)" }}>追放しました</h1>
-        <p style={{ fontSize: 22, fontWeight: "bold" }}>プレイヤー{executedPlayer}</p>
+        <p style={{ fontSize: 22, fontWeight: "bold" }}>{executedPlayer ? getPlayerName(executedPlayer) : ""}</p>
         <button
           onClick={() => {
             if (executedRole === "fox") {
@@ -1370,7 +1378,7 @@ export default function WordWolfPage() {
             <div key={participant.id} style={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 14, alignItems: "center", padding: "14px 16px", borderRadius: 16, background: participant.alive ? "rgba(255,255,255,0.12)" : "rgba(255,107,107,0.2)", backdropFilter: "blur(4px)" }}>
               <img src={getRoleImage(participant.role)} alt={getRoleLabel(participant.role)} width={88} height={88} style={{ objectFit: "contain", borderRadius: 12 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ fontSize: 24, fontWeight: "bold" }}>プレイヤー{participant.id}</div>
+                <div style={{ fontSize: 24, fontWeight: "bold" }}>{getPlayerName(participant.id)}</div>
                 <div style={{ fontSize: 18, opacity: 0.92 }}>{getRoleLabel(participant.role)}{participant.alive ? " / 生存" : " / 追放"}</div>
                 <div style={{ fontSize: 22, fontWeight: "bold", color: "#fff4a8" }}>お題：{renderWord(participant.word, 22)}</div>
               </div>

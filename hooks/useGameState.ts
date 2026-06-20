@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { Player } from "@/types/player"
 import { ResultType } from "@/types/result"
+import { buildRandomAssignments } from "@/types/discussion"
 
 export function useGameState() {
 
@@ -623,10 +624,11 @@ export function useGameState() {
     setPlayers(shuffledPlayers)
 
     const newGameId = Date.now().toString()
+    const gameAssignments = aiMode ? buildRandomAssignments(playerCount) : playerAssignments
     gameIdRef.current = newGameId
     setGameId(newGameId)
-    playerAssignmentsRef.current = playerAssignments
-    setPlayerAssignments(playerAssignments)
+    playerAssignmentsRef.current = gameAssignments
+    setPlayerAssignments(gameAssignments)
 
     const seerIndexes = shuffled
       .map((r, i) => ({ role: r, index: i }))
@@ -659,7 +661,7 @@ export function useGameState() {
     setCurrentPlayer(1)
     setShowRole(false)
 
-    saveGameState(shuffledPlayers, 0, "roleCheck", newGameId, playerAssignments)
+    saveGameState(shuffledPlayers, 0, "roleCheck", newGameId, gameAssignments)
 
     async function runStartAudio() {
       await playAudio("/audio/[00]これから人狼ゲームを開始します.wav")

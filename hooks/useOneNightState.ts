@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { Player, Role } from "@/types/player"
+import { buildRandomAssignments } from "@/types/discussion"
 
 export type OneNightPhase =
   | "setup"
@@ -281,10 +282,7 @@ export function useOneNightState() {
       alert("配役をすべて選択してください")
       return
     }
-    if (aiMode && Object.keys(playerAssignments).length < playerCount) {
-      alert("すべてのプレイヤーにキャラクターを割り当ててください")
-      return
-    }
+    const gameAssignments = aiMode ? buildRandomAssignments(playerCount) : playerAssignments
 
     const allRoles = setupSlots.map(s => s!.role)
     const shuffled = shuffle(allRoles)
@@ -321,6 +319,7 @@ export function useOneNightState() {
     setDiscussionEnded(false)
     discussionEndedRef.current = false
 
+    setPlayerAssignments(gameAssignments)
     setGameId(Date.now().toString())
 
     setPhase("night")

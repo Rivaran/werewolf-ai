@@ -8,6 +8,25 @@ export const CHARACTERS: Record<CharacterId, { name: string; img: string; color:
   ray: { name: "レイ", img: "/image/ai/ray.png", color: "#7B68EE", bubbleColor: "#F0EEFF" },
 }
 
+export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[]
+
+export function buildDefaultAssignments(playerCount: number) {
+  return Object.fromEntries(
+    CHARACTER_IDS.slice(0, playerCount).map((characterId, index) => [index + 1, characterId])
+  )
+}
+
+export function buildRandomAssignments(playerCount: number) {
+  const shuffled = [...CHARACTER_IDS]
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const target = Math.floor(Math.random() * (index + 1))
+    ;[shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]]
+  }
+  return Object.fromEntries(
+    shuffled.slice(0, playerCount).map((characterId, index) => [index + 1, characterId])
+  )
+}
+
 export type DiscussionMessage = {
   id: string
   playerNumber: number

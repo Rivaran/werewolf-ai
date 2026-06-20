@@ -35,6 +35,33 @@ type AiNightAction = {
   submittedAt: string
 }
 
+const characterNames: Record<string, string> = {
+  rivaran: "リバラン",
+  fin: "フィン",
+  gear: "ギア",
+  navia: "ナビア",
+  ray: "レイ",
+}
+const fallbackCharacterIds = ["rivaran", "fin", "gear", "navia", "ray"]
+
+function getPlayerName(state: GameState, playerNumber: number) {
+  const characterId = state.playerAssignments?.[playerNumber] ?? fallbackCharacterIds[playerNumber - 1]
+  return characterNames[characterId ?? ""] ?? `プレイヤー${playerNumber}`
+}
+
+function resolvePlayerNumber(state: GameState, playerNumber?: number, characterName?: string) {
+  if (playerNumber) return playerNumber
+  if (!characterName) return null
+  const normalized = characterName.trim().toLowerCase()
+  const assignments = Object.keys(state.playerAssignments ?? {}).length > 0
+    ? state.playerAssignments ?? {}
+    : Object.fromEntries(fallbackCharacterIds.map((characterId, index) => [index + 1, characterId]))
+  const entry = Object.entries(assignments).find(([, characterId]) =>
+    characterId.toLowerCase() === normalized || characterNames[characterId]?.toLowerCase() === normalized
+  )
+  return entry ? Number(entry[0]) : null
+}
+
 function getMode(state: GameState) {
   return state.mode ?? "werewolf"
 }
@@ -81,12 +108,16 @@ export function createWerewolfMcpServer() {
     {
       description: "現在のゲームモードで、自分だけの役職・お題・能力結果を確認する。",
       inputSchema: {
-        player_number: z.number().int().positive().describe("プレイヤー番号"),
+        player_number: z.number().int().positive().optional().describe("内部プレイヤー番号。character_name指定時は不要"),
+        character_name: z.string().optional().describe("自分の名前（リバラン、フィン、ギア、ナビア、レイ）"),
       },
     },
-    async ({ player_number }) => {
+    async ({ player_number: requestedPlayerNumber, character_name }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
+      const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
+      if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
+      const myName = getPlayerName(state, player_number)
       const mode = getMode(state)
 
       if (mode === "wordwolf") {
@@ -94,7 +125,7 @@ export function createWerewolfMcpServer() {
         if (!participant) return textResult(`プレイヤー${player_number}は存在しません。`)
         const reading = participant.word.reading ? `（${participant.word.reading}）` : ""
         return textResult(
-          `ゲームモード: 言葉人狼\nあなた（プレイヤー${player_number}）のお題は「${participant.word.text}」${reading}です。\n` +
+          `ゲームモード: 言葉人狼\n${myName}のお題は「${participant.word.text}」${reading}です。\n` +
           "自分が多数派・少数派・キツネのどれかは公開されません。会話から推理してください。\n" +
           (participant.alive ? "あなたは生存中です。" : "あなたは追放されています。")
         )
@@ -107,11 +138,11 @@ export function createWerewolfMcpServer() {
         const allies = original.role.id === "werewolf"
           ? state.originalPlayers
               ?.filter((item) => item && item.id !== player_number && item.role.id === "werewolf")
-              .map(item => `プレイヤー${item!.id}`) ?? []
+              .map(item => getPlayerName(state, item!.id)) ?? []
           : []
         const details = [
           `ゲームモード: 一夜人狼`,
-          `あなた（プレイヤー${player_number}）の最初の役職は「${original.role.name}」です。`,
+          `${myName}の最初の役職は「${original.role.name}」です。`,
           original.role.id === "werewolf"
             ? (allies.length > 0 ? `人狼の仲間: ${allies.join("、")}` : "あなたは一匹狼です。")
             : null,
@@ -132,11 +163,11 @@ export function createWerewolfMcpServer() {
 
       const alive = (state.players ?? [])
         .filter((item): item is NonNullable<Player> => item !== null && item.alive)
-        .map((item) => `プレイヤー${item.id}`)
+        .map((item) => getPlayerName(state, item.id))
         .join("、")
 
       return textResult(
-        `あなた（プレイヤー${player_number}）の役職は「${player.role.name}」です。\n` +
+        `${myName}の役職は「${player.role.name}」です。\n` +
           `現在の生存プレイヤー: ${alive}\n` +
           (state.privateInfo?.[player_number] ? `${state.privateInfo[player_number]}\n` : "") +
           (state.phase === "night" && state.currentPlayer === player_number
@@ -173,7 +204,7 @@ export function createWerewolfMcpServer() {
         mode === "onenight" ? "一夜勝負" : `${mode === "werewolf" ? state.day + 1 : state.day}日目`,
         "",
         "プレイヤー一覧:",
-        ...publicPlayers.map(player => `  プレイヤー${player.id}: ${player.alive ? "生存" : "死亡・追放"}`),
+        ...publicPlayers.map(player => `  ${getPlayerName(state, player.id)}: ${player.alive ? "生存" : "死亡・追放"}`),
       ]
       return textResult(lines.join("\n"))
     }
@@ -192,7 +223,7 @@ export function createWerewolfMcpServer() {
       const candidates = getMode(state) === "wordwolf" ? state.participants ?? [] : state.players ?? []
       const alive = candidates
         .filter((item): item is NonNullable<typeof item> => item !== null && item.alive)
-        .map((item) => `プレイヤー${item.id}`)
+        .map((item) => getPlayerName(state, item.id))
       return textResult(`生存中: ${alive.join("、")}（${alive.length}人）`)
     }
   )
@@ -202,19 +233,28 @@ export function createWerewolfMcpServer() {
     {
       description: "夜フェーズの行動を決定する。通常人狼の襲撃・護衛・占い、一夜人狼の占い・怪盗交換・行動なしに対応する。",
       inputSchema: {
-        player_number: z.number().int().positive().describe("自分のプレイヤー番号"),
+        player_number: z.number().int().positive().optional().describe("内部プレイヤー番号。character_name指定時は不要"),
+        character_name: z.string().optional().describe("自分の名前"),
         action: z.enum(["attack", "guard", "inspect", "inspect_center", "swap", "pass"]).describe(
           "attack=襲撃、guard=護衛、inspect=占い、inspect_center=中央2枚の確認、swap=怪盗交換、pass=行動なし"
         ),
-        target_player: z.number().int().positive().optional().describe("対象プレイヤー番号。passとinspect_centerでは不要"),
+        target_player: z.number().int().positive().optional().describe("対象の内部プレイヤー番号"),
+        target_character_name: z.string().optional().describe("対象の名前。passとinspect_centerでは不要"),
       },
     },
-    async ({ player_number, action, target_player }) => {
+    async ({ player_number: requestedPlayerNumber, character_name, action, target_player: requestedTarget, target_character_name }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
+      const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
+      if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
+      const target_player = resolvePlayerNumber(state, requestedTarget, target_character_name) ?? undefined
       if (state.phase !== "night") return textResult("現在は夜フェーズではありません。")
       if (state.currentPlayer !== player_number) {
-        return textResult(`現在行動するのはプレイヤー${state.currentPlayer ?? "不明"}です。`)
+        return textResult(
+          state.currentPlayer
+            ? `現在行動するのは${getPlayerName(state, state.currentPlayer)}です。`
+            : "現在の手番が不明です。"
+        )
       }
 
       const mode = getMode(state)
@@ -256,12 +296,12 @@ export function createWerewolfMcpServer() {
       let privateResult = "夜行動を受け付けました。"
       if (action === "inspect" && target) {
         privateResult = mode === "werewolf"
-          ? `占い結果: プレイヤー${target_player}は${target.role.id === "werewolf" ? "人狼です" : "人狼ではありません"}。`
-          : `占い結果: プレイヤー${target_player}の役職は「${state.originalPlayers?.[target_player! - 1]?.role.name}」です。`
+          ? `占い結果: ${getPlayerName(state, target_player!)}は${target.role.id === "werewolf" ? "人狼です" : "人狼ではありません"}。`
+          : `占い結果: ${getPlayerName(state, target_player!)}の役職は「${state.originalPlayers?.[target_player! - 1]?.role.name}」です。`
       } else if (action === "inspect_center") {
         privateResult = `中央の2枚は「${state.centerCards?.map(card => card.name).join("」「")}」です。`
       } else if (action === "swap" && target) {
-        privateResult = `プレイヤー${target_player}と交換し、現在の役職は「${target.role.name}」です。`
+        privateResult = `${getPlayerName(state, target_player!)}と交換し、現在の役職は「${target.role.name}」です。`
       }
 
       const nextState: GameState = {
@@ -287,13 +327,16 @@ export function createWerewolfMcpServer() {
     {
       description: "議論フェーズに発言を投稿する。自分のプレイヤー番号と発言内容を指定する。",
       inputSchema: {
-        player_number: z.number().int().positive().describe("自分のプレイヤー番号"),
+        player_number: z.number().int().positive().optional().describe("内部プレイヤー番号。character_name指定時は不要"),
+        character_name: z.string().optional().describe("自分の名前"),
         message: z.string().min(1).describe("発言内容"),
       },
     },
-    async ({ player_number, message }) => {
+    async ({ player_number: requestedPlayerNumber, character_name, message }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
+      const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
+      if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
       if (!state.gameId) {
         return textResult("ゲームIDが見つかりません。AIモードでゲームを開始してください。")
       }

@@ -10,6 +10,7 @@ import DiscussionChat from "@/components/DiscussionChat"
 import styles from "@/app/page.module.css"
 import { useOneNightState } from "@/hooks/useOneNightState"
 import { useWakeLock } from "@/hooks/useWakeLock"
+import { CHARACTERS } from "@/types/discussion"
 
 const ROLE_SUMMARY_ORDER = [
   { id: "werewolf", label: "人狼" },
@@ -42,6 +43,15 @@ export default function OneNightWolfPage() {
   const s = useOneNightState()
   const [showRoleSummary, setShowRoleSummary] = useState(false)
   const [showRuleHelp, setShowRuleHelp] = useState(false)
+
+  const fallbackCharacterIds = ["rivaran", "fin", "gear", "navia", "ray"]
+  const getCharacterId = (playerNumber: number) =>
+    s.playerAssignments[playerNumber] ?? fallbackCharacterIds[playerNumber - 1]
+  const getPlayerName = (playerNumber: number) => {
+    if (!s.aiMode) return `プレイヤー${playerNumber}`
+    return CHARACTERS[getCharacterId(playerNumber) as keyof typeof CHARACTERS]?.name ?? `プレイヤー${playerNumber}`
+  }
+  const isAiPlayer = (playerNumber: number) => s.aiMode && getCharacterId(playerNumber) !== "rivaran"
 
   useWakeLock(s.phase !== "setup")
 
@@ -333,9 +343,9 @@ export default function OneNightWolfPage() {
         {!s.nightActionReady ? (
           <div className={`${styles.flexCenterColumn} ${styles.gap16}`} style={{ marginTop: 170 + mamaNightOffset }}>
             <div className={s.theme === "mama" ? styles.playerBadgeMama : styles.playerBadge}>
-              プレイヤー {s.currentPlayer}{s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" ? "（AI）" : ""}
+              {getPlayerName(s.currentPlayer)}{isAiPlayer(s.currentPlayer) ? "（AI）" : ""}
             </div>
-            {s.aiMode && s.playerAssignments[s.currentPlayer] !== "rivaran" ? (
+            {isAiPlayer(s.currentPlayer) ? (
               <p style={{ fontSize: 15, opacity: 0.8 }}>MCPから夜行動を受信しています</p>
             ) : (
               <button
@@ -392,7 +402,7 @@ export default function OneNightWolfPage() {
                       onClick={() => s.handleRobberSelect(p.id)}
                       style={{ padding: "12px 20px", borderRadius: 10, border: "none", background: "rgba(255,255,255,0.75)", color: "#333", fontSize: 18, fontWeight: "bold", cursor: "pointer" }}
                     >
-                      プレイヤー{p.id}
+                      {getPlayerName(p.id)}
                     </button>
                   ))}
                 </div>
@@ -402,7 +412,7 @@ export default function OneNightWolfPage() {
             {roleId === "robber" && s.robberNewRole !== null && !s.showNextButton && (
               <div style={{ background: "rgba(0,0,0,0.55)", borderRadius: 14, padding: "20px 28px", textAlign: "center" }}>
                 <p style={{ fontSize: 16, marginBottom: 10 }}>
-                  プレイヤー{s.robberTarget}と役職を交換しました
+                  {getPlayerName(s.robberTarget!)}と役職を交換しました
                 </p>
                 <p style={{ fontSize: 20, fontWeight: "bold", marginTop: 8 }}>あなたの新しい役職：{s.robberNewRole.name}</p>
                 {s.robberNewRole.id === "werewolf" && (
@@ -450,7 +460,7 @@ export default function OneNightWolfPage() {
                       onClick={() => s.handleSeerPlayerSelect(p.id)}
                       style={{ padding: "12px 20px", borderRadius: 10, border: "none", background: "rgba(255,255,255,0.75)", color: "#333", fontSize: 18, fontWeight: "bold", cursor: "pointer" }}
                     >
-                      プレイヤー{p.id}
+                      {getPlayerName(p.id)}
                     </button>
                   ))}
                 </div>
@@ -465,7 +475,7 @@ export default function OneNightWolfPage() {
                   padding: s.theme === "mama" ? "18px 28px 14px" : "0",
                   textAlign: "center"
                 }}>
-                  <p style={{ fontSize: 16, marginBottom: 10 }}>プレイヤー{s.seerTarget}の役職</p>
+                  <p style={{ fontSize: 16, marginBottom: 10 }}>{getPlayerName(s.seerTarget!)}の役職</p>
                   <div style={{ display: "flex", justifyContent: "center" }}>
                     <img src={s.seerResult.img} width={70} alt={s.seerResult.name} />
                   </div>
@@ -529,7 +539,7 @@ export default function OneNightWolfPage() {
                 <p style={{ opacity: 0.7 }}>あなたは一匹狼です</p>
               ) : (
                 wolfAllies.map(p => p && (
-                  <p key={p.id} style={{ fontSize: 18, marginBottom: 8 }}>プレイヤー{p.id}</p>
+                  <p key={p.id} style={{ fontSize: 18, marginBottom: 8 }}>{getPlayerName(p.id)}</p>
                 ))
               )}
               <button
