@@ -459,7 +459,7 @@ export function useOneNightState() {
       await playAudio("/audio/[04-2]議論時間は３分です。議論を開始してください.wav")
       setDiscussionReady(true)
       discussionEndedRef.current = false
-      startTimer()
+      if (!aiMode) startTimer()
     }
     run()
   }

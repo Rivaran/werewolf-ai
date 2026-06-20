@@ -441,7 +441,7 @@ export default function WordWolfPage() {
   async function startDiscussionRound(nextDay: number) {
     setDay(nextDay)
     setTimeLeft(nextDay === 1 ? 180 : 120)
-    setTimerRunning(true)
+    setTimerRunning(!aiMode)
     discussionEndedRef.current = false
     setPhase("discussion")
     await playAudio(
