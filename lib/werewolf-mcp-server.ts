@@ -16,6 +16,7 @@ type GameState = {
   originalPlayers?: Player[]
   centerCards?: Array<{ id: string; name: string }>
   privateInfo?: Record<number, string>
+  privateInfoGameIds?: Record<number, string>
   currentPlayer?: number
   aiActions?: Record<string, AiNightAction>
   participants?: Array<{
@@ -118,6 +119,9 @@ export function createWerewolfMcpServer() {
       const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
       if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
       const myName = getPlayerName(state, player_number)
+      const currentPrivateInfo = state.privateInfoGameIds?.[player_number] === state.gameId
+        ? state.privateInfo?.[player_number]
+        : null
       const mode = getMode(state)
 
       if (mode === "wordwolf") {
@@ -146,7 +150,7 @@ export function createWerewolfMcpServer() {
           original.role.id === "werewolf"
             ? (allies.length > 0 ? `人狼の仲間: ${allies.join("、")}` : "あなたは一匹狼です。")
             : null,
-          state.privateInfo?.[player_number] ?? null,
+          currentPrivateInfo,
           state.phase === "night" && state.currentPlayer === player_number
             ? original.role.id === "seer"
               ? "あなたの手番です。submit_night_actionでinspectまたはinspect_centerを選んでください。"
@@ -169,7 +173,7 @@ export function createWerewolfMcpServer() {
       return textResult(
         `${myName}の役職は「${player.role.name}」です。\n` +
           `現在の生存プレイヤー: ${alive}\n` +
-          (state.privateInfo?.[player_number] ? `${state.privateInfo[player_number]}\n` : "") +
+          (currentPrivateInfo ? `${currentPrivateInfo}\n` : "") +
           (state.phase === "night" && state.currentPlayer === player_number
             ? player.role.id === "werewolf"
               ? "あなたの手番です。submit_night_actionでattackと襲撃先を指定してください。\n"
@@ -325,6 +329,7 @@ export function createWerewolfMcpServer() {
       const nextState: GameState = {
         ...state,
         privateInfo: { ...state.privateInfo, [player_number]: privateResult },
+        privateInfoGameIds: { ...state.privateInfoGameIds, [player_number]: state.gameId ?? "" },
         aiActions: {
           ...state.aiActions,
           [actionKey(state, player_number)]: {

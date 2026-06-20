@@ -10,13 +10,16 @@ export async function POST(req: NextRequest) {
     .eq("id", "current")
     .maybeSingle()
   const previous = current?.data ?? {}
+  const isNewGame = Boolean(previous.gameId && body.gameId && previous.gameId !== body.gameId)
   const merged = {
     ...body,
-    aiActions: body.aiActions ?? previous.aiActions ?? {},
-    privateInfo: {
-      ...(previous.privateInfo ?? {}),
-      ...(body.privateInfo ?? {}),
-    },
+    aiActions: isNewGame ? body.aiActions ?? {} : body.aiActions ?? previous.aiActions ?? {},
+    privateInfo: isNewGame
+      ? body.privateInfo ?? {}
+      : { ...(previous.privateInfo ?? {}), ...(body.privateInfo ?? {}) },
+    privateInfoGameIds: isNewGame
+      ? body.privateInfoGameIds ?? {}
+      : { ...(previous.privateInfoGameIds ?? {}), ...(body.privateInfoGameIds ?? {}) },
   }
   const { error } = await supabase
     .from("werewolf_game_state")
