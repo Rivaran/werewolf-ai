@@ -44,6 +44,7 @@ const characterNames: Record<string, string> = {
   ray: "レイ",
 }
 const fallbackCharacterIds = ["rivaran", "fin", "gear", "navia", "ray"]
+const characterNameSchema = z.enum(["リバラン", "フィン", "ギア", "ナビア", "レイ"])
 
 function getPlayerName(state: GameState, playerNumber: number) {
   const characterId = state.playerAssignments?.[playerNumber] ?? fallbackCharacterIds[playerNumber - 1]
@@ -102,22 +103,21 @@ function textResult(text: string) {
 }
 
 export function createWerewolfMcpServer() {
-  const server = new McpServer({ name: "werewolf-game", version: "1.0.0" })
+  const server = new McpServer({ name: "werewolf-game", version: "1.1.0" })
 
   server.registerTool(
     "get_my_role",
     {
       description: "現在のゲームモードで、自分だけの役職・お題・能力結果を確認する。",
       inputSchema: {
-        player_number: z.number().int().positive().optional().describe("内部プレイヤー番号。character_name指定時は不要"),
-        character_name: z.string().optional().describe("自分の名前（リバラン、フィン、ギア、ナビア、レイ）"),
+        character_name: characterNameSchema.describe("自分の名前"),
       },
     },
-    async ({ player_number: requestedPlayerNumber, character_name }) => {
+    async ({ character_name }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
-      const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
-      if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
+      const player_number = resolvePlayerNumber(state, undefined, character_name)
+      if (!player_number) return textResult("自分の名前を確認できませんでした。")
       const myName = getPlayerName(state, player_number)
       const currentPrivateInfo = state.privateInfoGameIds?.[player_number] === state.gameId
         ? state.privateInfo?.[player_number]
@@ -255,21 +255,19 @@ export function createWerewolfMcpServer() {
     {
       description: "夜フェーズの行動を決定する。通常人狼の襲撃・護衛・占い、一夜人狼の占い・怪盗交換・行動なしに対応する。",
       inputSchema: {
-        player_number: z.number().int().positive().optional().describe("内部プレイヤー番号。character_name指定時は不要"),
-        character_name: z.string().optional().describe("自分の名前"),
+        character_name: characterNameSchema.describe("自分の名前"),
         action: z.enum(["attack", "guard", "inspect", "inspect_center", "swap", "pass"]).describe(
           "attack=襲撃、guard=護衛、inspect=占い、inspect_center=中央2枚の確認、swap=怪盗交換、pass=行動なし"
         ),
-        target_player: z.number().int().positive().optional().describe("対象の内部プレイヤー番号"),
-        target_character_name: z.string().optional().describe("対象の名前。passとinspect_centerでは不要"),
+        target_character_name: characterNameSchema.optional().describe("対象の名前。passとinspect_centerでは不要"),
       },
     },
-    async ({ player_number: requestedPlayerNumber, character_name, action, target_player: requestedTarget, target_character_name }) => {
+    async ({ character_name, action, target_character_name }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
-      const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
-      if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
-      const target_player = resolvePlayerNumber(state, requestedTarget, target_character_name) ?? undefined
+      const player_number = resolvePlayerNumber(state, undefined, character_name)
+      if (!player_number) return textResult("自分の名前を確認できませんでした。")
+      const target_player = resolvePlayerNumber(state, undefined, target_character_name) ?? undefined
       if (state.phase !== "night") return textResult("現在は夜フェーズではありません。")
       if (state.currentPlayer !== player_number) {
         return textResult(
@@ -348,18 +346,17 @@ export function createWerewolfMcpServer() {
   server.registerTool(
     "post_discussion_message",
     {
-      description: "議論フェーズに発言を投稿する。自分のプレイヤー番号と発言内容を指定する。",
+      description: "議論フェーズに発言を投稿する。自分の名前と発言内容を指定する。",
       inputSchema: {
-        player_number: z.number().int().positive().optional().describe("内部プレイヤー番号。character_name指定時は不要"),
-        character_name: z.string().optional().describe("自分の名前"),
+        character_name: characterNameSchema.describe("自分の名前"),
         message: z.string().min(1).describe("発言内容"),
       },
     },
-    async ({ player_number: requestedPlayerNumber, character_name, message }) => {
+    async ({ character_name, message }) => {
       const state = await loadState()
       if (!state) return textResult("ゲームが開始されていません。")
-      const player_number = resolvePlayerNumber(state, requestedPlayerNumber, character_name)
-      if (!player_number) return textResult("自分の名前または内部プレイヤー番号を指定してください。")
+      const player_number = resolvePlayerNumber(state, undefined, character_name)
+      if (!player_number) return textResult("自分の名前を確認できませんでした。")
       if (!state.gameId) {
         return textResult("ゲームIDが見つかりません。AIモードでゲームを開始してください。")
       }
