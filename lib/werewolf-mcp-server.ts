@@ -103,7 +103,7 @@ function textResult(text: string) {
 }
 
 export function createWerewolfMcpServer() {
-  const server = new McpServer({ name: "werewolf-game", version: "1.1.0" })
+  const server = new McpServer({ name: "werewolf-game-v1-2", version: "1.2.0" })
 
   server.registerTool(
     "get_my_role",
