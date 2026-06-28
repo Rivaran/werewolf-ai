@@ -16,7 +16,9 @@ export default function DiscussionChat({ gameId, day, morningDeath = null, playe
   const [messages, setMessages] = useState<DiscussionMessage[]>([])
   const [inputText, setInputText] = useState("")
   const [posting, setPosting] = useState(false)
+  const messagesRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const shouldFollowMessagesRef = useRef(true)
 
   // Find rivaran's player number
   const rivaranPlayerNum = Object.entries(playerAssignments).find(([, v]) => v === "rivaran")?.[0]
@@ -41,8 +43,17 @@ export default function DiscussionChat({ gameId, day, morningDeath = null, playe
     return () => clearInterval(interval)
   }, [gameId, day])
 
+  function handleMessagesScroll() {
+    const el = messagesRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    shouldFollowMessagesRef.current = distanceFromBottom < 96
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (shouldFollowMessagesRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    }
   }, [messages])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -63,6 +74,7 @@ export default function DiscussionChat({ gameId, day, morningDeath = null, playe
         }),
       })
       setInputText("")
+      shouldFollowMessagesRef.current = true
       await fetchMessages()
     } catch {
       // ignore
@@ -134,6 +146,8 @@ export default function DiscussionChat({ gameId, day, morningDeath = null, playe
 
       {/* Messages */}
       <div
+        ref={messagesRef}
+        onScroll={handleMessagesScroll}
         style={{
           flex: 1,
           overflowY: "auto",
